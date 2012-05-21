@@ -1,0 +1,12 @@
+
+(add new changes on top of this file)
+
+10-02-11 DocTeam, Daniel Bruessler <danielb@typo3.org>
+
+    * added TXT as type for literallayout
+
+08-12-14 DocTeam, Daniel Bruessler <danielb@typo3.org>
+
+    * added the rng-file for validation of docbook-documents before import into TER
+    * upload as 1.0.0
+

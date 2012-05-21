@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/" xmlns:moz="http://www.mozilla.org/2006/browser/search/">
+ <ShortName>TYPO3 Search</ShortName>
+ <Description>TYPO3 search in wiki.typo.org/TSref and many more</Description>
+ <InputEncoding>UTF-8</InputEncoding>
+ <Contact>searchtypo3@martinholtz.de</Contact>
+ <Image height="16" width="16" type="image/x-icon">http://www.martinholtz.de/search_typo3_wiki.png</Image>
+
+ <Developer>Martin Holtz</Developer>
+ <Url type="text/html" method="get" template="http://www.martinholtz.de/jumpto.php?lang=en&amp;search={searchTerms}" />
+ <Url type="application/x-suggestions+json" template="http://www.martinholtz.de/suggestion.php?command={searchTerms}"/>
+</OpenSearchDescription>

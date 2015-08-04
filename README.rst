@@ -38,11 +38,13 @@ Edit or create file :file:`/etc/ansible/hosts` and put a reference to your (blan
     [sphinx]
     192.168.81.132    ansible_ssh_user=xavier
 
-Provisioning Pootle server
---------------------------
+Provisioning Documentation server
+---------------------------------
 
 Run::
 
+    $ git clone http://git.typo3.org/Teams/Documentation.git
+    $ cd Documentation
     $ ansible-playbook -s install.yml
 
 .. note::

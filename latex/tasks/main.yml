@@ -2,6 +2,9 @@
 - name: Install TeX Live base components
   apt: pkg=texlive-base state=installed update_cache=true
 
+- name: Install TeX Live LaTeX
+  apt: pkg=texlive-latex-base state=installed
+
 - name: Install TeX Live recommended packages for LaTeX
   apt: pkg=texlive-latex-recommended state=installed
 
@@ -16,3 +19,24 @@
 
 - name: Install make command
   apt: pkg=make state=installed
+
+- name: Install xzdec (used by tlmgr)
+  apt: pkg=xzdec state=installed
+
+- name: Initialize texmf share for Tex Live
+  shell: sudo tlmgr --usertree /usr/local/share/texmf init-usertree
+  args:
+    creates: /usr/local/share/texmf/tlpkg/texlive.tlpdb
+
+- name: Install LaTeX package "ec"
+  shell: sudo tlmgr --usertree /usr/local/share/texmf install ec
+  args:
+    creates: /usr/local/share/texmf/fonts/tfm/jknappen/ec
+
+- name: Install LaTeX package "cm-super"
+  shell: sudo tlmgr --usertree /usr/local/share/texmf install cm-super
+  args:
+     creates: /usr/local/share/texmf/tex/latex/cm-super
+
+- name: Update Tex Live packages
+  shell: sudo tlmgr --usertree /usr/local/share/texmf update --all

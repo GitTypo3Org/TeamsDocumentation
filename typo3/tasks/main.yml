@@ -10,3 +10,12 @@
 
 - name: Install TYPO3 theme for Sphinx
   pip: name=t3SphinxThemeRtd virtualenv={{ sphinx_virtualenv }}
+
+- name: Install TYPO3 theme for LaTeX
+  copy: src=texmf/ dest=/usr/local/share/texmf
+
+- name: Make font conversion script executable
+  file: path=/usr/local/share/texmf/sources/typo3-share/convert-share.sh mode=0755
+
+- name: Install TYPO3 Share font for LaTeX
+  shell: /usr/local/share/texmf/sources/typo3-share/convert-share.sh

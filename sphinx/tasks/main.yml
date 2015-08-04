@@ -1,6 +1,6 @@
 ---
 - name: Create a sphinx user
-  user: name=sphinx comment="Sphinx server daemon" system=no state=present home=/home/sphinx createhome=yes shell=/bin/bash
+  user: name=sphinx comment="Sphinx server admin" system=no state=present home=/home/sphinx createhome=yes shell=/bin/bash
 
 - name: Create directory for Sphinx
   file: path={{ sphinx_virtualenv }} state=directory

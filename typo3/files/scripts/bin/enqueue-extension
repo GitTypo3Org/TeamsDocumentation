@@ -1,0 +1,31 @@
+#!/bin/bash
+
+. /home/sphinx/scripts/etc/sphinx.conf
+
+EXTENSION=$1
+VERSION=$2
+
+if [[ -z "${EXTENSION}" ]]; then
+	echo "Usage: $0 <extension-key> <version>" >&2
+	exit 1
+fi
+if [[ -z "${VERSION}" ]]; then
+	echo "Usage: $0 ${EXTENSION} <version>" >&2
+	t3xutils.phar info ${EXTENSION}
+	exit 1
+fi
+
+pushd /tmp >/dev/null
+
+FILE="${EXTENSION}_${VERSION}.t3x"
+rm -f $FILE
+
+t3xutils.phar fetch ${EXTENSION} ${VERSION}
+
+if [ -f ${FILE} ]; then
+	mkdir -p ${RENDER_WORKDIR}/queue/${EXTENSION}/${VERSION}
+	t3xutils.phar extract ${FILE} ${RENDER_WORKDIR}/queue/${EXTENSION}/${VERSION}
+	rm -f ${FILE}
+fi
+
+popd >/dev/null

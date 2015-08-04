@@ -2,11 +2,44 @@
 - name: Install git
   apt: pkg=git state=installed update_cache=true
 
+- name: Install command-line interpreter for php5
+  apt: pkg=php5-cli state=installed
+
+- name: Install zip command
+  apt: pkg=zip state=installed update_cache=true
+
+- name: Install pandoc
+  apt: pkg=pandoc state=installed
+
+- name: Install LibreOffice
+  apt: pkg=libreoffice state=installed
+
+- name: Install python-uno
+  pip: name=uno virtualenv={{ sphinx_virtualenv }}
+
+- name: Install PyODConverter
+  pip: name=PyODConverter virtualenv={{ sphinx_virtualenv }}
+
+- name: Create a daemon user libreoffice
+  user: name=libreoffice comment="LibreOffice server daemon" system=yes state=present home=/nonexistent createhome=no shell=/usr/bin/nologin
+
+- name: Set up init.d scripts for LibreOffice-headless
+  template: src=libreoffice-headless.j2 dest=/etc/init.d/libreoffice-headless owner=root group=root mode=0755
+
+- name: Start LibreOffice-headless
+  service: name=libreoffice-headless enabled=yes state=started
+
 - name: Install Sphinx user profile
   template: src=bash_profile.j2 dest=/home/sphinx/.bash_profile owner=sphinx group=sphinx
 
 - name: Install TYPO3 management scripts
-  copy: src=scripts dest=/home/sphinx owner=sphinx group=sphinx mode=0750
+  copy: src=scripts dest=/home/sphinx owner=sphinx group=sphinx mode=0755
+
+- name: Register Sphinx configuration
+  template: src=scripts/etc/sphinx.conf.j2 dest=/home/sphinx/scripts/etc/sphinx.conf owner=sphinx group=sphinx
+
+- name: Install Sphinx rendering configuration
+  template: src=scripts/etc/LocalConfiguration.php.j2 dest=/home/sphinx/scripts/etc/LocalConfiguration.php owner=sphinx group=sphinx
 
 - name: Install TYPO3 theme for Sphinx
   pip: name=t3SphinxThemeRtd virtualenv={{ sphinx_virtualenv }}

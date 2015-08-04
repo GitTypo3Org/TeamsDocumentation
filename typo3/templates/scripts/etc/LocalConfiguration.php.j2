@@ -1,0 +1,22 @@
+<?php
+
+return array(
+	'DIR' => array(
+		// Path to a working directory for this extension. Will hold
+		// cache files and queue of conversion jobs
+		'work' => '{{ doc_render_workdir }}',
+
+		// Publish to https://docs.typo3.org/typo3cms/extensions/<ext-key>/
+		'publish' => '/var/www/{{ domain }}/public/typo3cms/extensions',
+
+		'scripts' => '/home/sphinx/scripts/bin',
+		'etc' => '/home/sphinx/scripts/etc',
+	),
+	'BIN' => array(
+		// Path to t3xutils.phar, available off
+		// https://github.com/etobi/Typo3ExtensionUtils
+		't3xutils.phar' => '/home/sphinx/scripts/bin/t3xutils.phar',
+
+		'pandoc' => '/usr/bin/pandoc',
+	)
+);

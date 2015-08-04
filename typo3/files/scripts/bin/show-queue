@@ -1,0 +1,31 @@
+#!/bin/bash
+
+. /home/sphinx/scripts/etc/sphinx.conf
+
+pushd ${RENDER_WORKDIR}/queue >/dev/null
+
+echo "======================================"
+echo "Extensions in the rendering queue"
+echo "======================================"
+echo
+
+COUNTER=0
+EXTENSIONS=$(find . -maxdepth 1 -type d | cut -b3- | sort)
+for EXTENSION in ${EXTENSIONS}; do
+	pushd ${EXTENSION} >/dev/null
+
+	VERSIONS=$(find . -maxdepth 1 -type d | cut -b3- | sort)
+	for VERSION in ${VERSIONS}; do
+		if [ $(find $VERSION -type f | wc -l) -gt 0 ]; then
+			COUNTER=$((${COUNTER}+1))
+			echo "- ${EXTENSION} (v${VERSION})"
+		fi
+	done
+
+	popd >/dev/null
+done
+
+echo
+echo "${COUNTER} extension(s)"
+
+popd >/dev/null

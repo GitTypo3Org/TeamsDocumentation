@@ -17,6 +17,9 @@
 - name: Install TeX Live extra fonts
   apt: pkg=texlive-fonts-extra state=installed
 
+- name: Install TeX Live language packs
+  apt: pkg=texlive-lang-all state=installed
+
 - name: Install make command
   apt: pkg=make state=installed
 

@@ -43,7 +43,7 @@ Provisioning Documentation server
 
 Run::
 
-    $ git clone http://git.typo3.org/Teams/Documentation.git
+    $ git clone https://git.typo3.org/Teams/Documentation.git
     $ cd Documentation
     $ ansible-playbook -s install.yml
 

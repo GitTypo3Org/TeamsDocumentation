@@ -1,0 +1,12 @@
+---
+- name: Install git
+  apt: pkg=git state=installed update_cache=true
+
+- name: Install Sphinx user profile
+  template: src=bash_profile.j2 dest=/home/sphinx/.bash_profile owner=sphinx group=sphinx
+
+- name: Install TYPO3 management scripts
+  copy: src=scripts dest=/home/sphinx owner=sphinx group=sphinx mode=0750
+
+- name: Install TYPO3 theme for Sphinx
+  pip: name=t3SphinxThemeRtd virtualenv={{ sphinx_virtualenv }}

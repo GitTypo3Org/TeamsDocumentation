@@ -1,0 +1,10 @@
+PATH="/home/sphinx/scripts/bin:{{ sphinx_virtualenv }}/bin:$PATH"
+export PATH
+
+echo
+echo "Welcome TYPO3 Documentation Manager"
+echo "==================================="
+echo
+echo "Administration command:"
+find ~/scripts/bin -maxdepth 1 -type f -perm +111 -exec basename {} \; | awk '{ print "\t"$1 }' | sort
+echo

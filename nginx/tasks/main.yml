@@ -24,12 +24,12 @@
 
 - name: Create web root
   when: nginxinstalled|success
-  file: dest=/var/www/{{ domain }}/public mode=755 state=directory owner=www-data group=www-data
+  file: dest=/var/www/{{ domain }}/public mode=755 state=directory owner=sphinx group=www-data
   notify:
     - Reload Nginx
 
 - name: Web root permissions
   when: nginxinstalled|success
-  file: dest=/var/www/{{ domain }} mode=755 state=directory owner=www-data group=www-data recurse=yes
+  file: dest=/var/www/{{ domain }} mode=755 state=directory owner=sphinx group=www-data recurse=yes
   notify:
     - Reload Nginx

@@ -1,0 +1,10 @@
+---
+title: "TYPO3 Documentation Server"
+admin_name: "Xavier Perseguers"
+admin_email: "xavier@typo3.org"
+
+domain: "sphinx.typo3.loc"
+from_email: "no-reply@typo3.loc"
+
+sphinx_virtualenv: "/opt/local/sphinx"
+sphinx_version: 1.3.1

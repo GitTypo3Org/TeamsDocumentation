@@ -1,0 +1,35 @@
+---
+- name: Install Nginx
+  apt: pkg=nginx state=installed update_cache=true
+  register: nginxinstalled
+  notify:
+    - Start Nginx
+
+- name: Add H5BP config
+  when: nginxinstalled|success
+  copy: src=h5bp dest=/etc/nginx owner=root group=root
+
+- name: Disable default site
+  when: nginxinstalled|success
+  file: dest=/etc/nginx/sites-enabled/default state=absent
+
+- name: Add documentation server site config
+  when: nginxinstalled|success
+  register: typo3config
+  template: src=virtualhost.conf.j2 dest=/etc/nginx/sites-available/{{ domain }}.conf owner=root group=root
+
+- name: Enable documentation server site config
+  when: typo3config|success
+  file: src=/etc/nginx/sites-available/{{ domain }}.conf dest=/etc/nginx/sites-enabled/{{ domain }}.conf state=link
+
+- name: Create web root
+  when: nginxinstalled|success
+  file: dest=/var/www/{{ domain }}/public mode=755 state=directory owner=www-data group=www-data
+  notify:
+    - Reload Nginx
+
+- name: Web root permissions
+  when: nginxinstalled|success
+  file: dest=/var/www/{{ domain }} mode=755 state=directory owner=www-data group=www-data recurse=yes
+  notify:
+    - Reload Nginx

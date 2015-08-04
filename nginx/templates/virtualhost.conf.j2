@@ -1,0 +1,20 @@
+server {
+    listen 80 default_server;
+    server_name {{ domain }};
+
+    # Enable gzip compression
+    gzip on;
+
+    root /var/www/{{ domain }}/public;
+    index Index.html index.html;
+
+    access_log /var/log/nginx/{{ domain }}.log;
+    error_log /var/log/nginx/{{ domain }}-error.log error;
+
+    charset utf-8;
+
+    include h5bp/basic.conf;
+
+    location = /favicon.ico { log_not_found off; access_log off; }
+    location = /robots.txt  { log_not_found off; access_log off; }
+}

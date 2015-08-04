@@ -1,0 +1,19 @@
+---
+- name: Create directory for Sphinx
+  file: path={{ sphinx_virtualenv }} state=directory
+
+- name: Install pip
+  apt: pkg=python-pip state=installed
+  register: pipinstalled
+
+- name: Set up the virtual environment
+  pip: name=virtualenv
+  when: pipinstalled|success
+  register: virtualenvinstalled
+
+- name: Install Sphinx v{{ sphinx_version }}
+  pip: name=Sphinx version={{ sphinx_version }} virtualenv={{ sphinx_virtualenv }}
+  when: virtualenvinstalled
+
+- name: Create a sphinx user
+  user: name=sphinx comment="Sphinx server daemon" system=no state=present home=/home/sphinx createhome=yes shell=/bin/bash

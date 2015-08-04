@@ -5,4 +5,5 @@
   roles:
     - sphinx
     - nginx
+    - latex
     - typo3

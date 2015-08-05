@@ -1,4 +1,7 @@
 ---
+- name: Create a sphinx user
+  user: name=sphinx comment="Sphinx server daemon" system=no state=present home=/home/sphinx createhome=yes shell=/bin/bash
+
 - name: Create directory for Sphinx
   file: path={{ sphinx_virtualenv }} state=directory
 
@@ -15,5 +18,26 @@
   pip: name=Sphinx version={{ sphinx_version }} virtualenv={{ sphinx_virtualenv }}
   when: virtualenvinstalled
 
-- name: Create a sphinx user
-  user: name=sphinx comment="Sphinx server daemon" system=no state=present home=/home/sphinx createhome=yes shell=/bin/bash
+- name: Install Mercurial
+  apt: pkg=mercurial state=installed
+
+- name: Fetch Sphinx extensions
+  hg: repo=https://bitbucket.org/xperseguers/sphinx-contrib dest={{ sphinx_virtualenv }}/sphinx-contrib
+
+- name: Install sphinxcontrib.googlechart
+  shell: cd {{ sphinx_virtualenv }}/sphinx-contrib/googlechart && sudo {{ sphinx_virtualenv }}/bin/python setup.py install
+
+- name: Install sphinxcontrib.googlemaps
+  shell: cd {{ sphinx_virtualenv }}/sphinx-contrib/googlemaps && sudo {{ sphinx_virtualenv }}/bin/python setup.py install
+
+- name: Install sphinxcontrib.httpdomain
+  shell: cd {{ sphinx_virtualenv }}/sphinx-contrib/httpdomain && sudo {{ sphinx_virtualenv }}/bin/python setup.py install
+
+- name: Install sphinxcontrib.numfig
+  shell: cd {{ sphinx_virtualenv }}/sphinx-contrib/numfig && sudo {{ sphinx_virtualenv }}/bin/python setup.py install
+
+- name: Install sphinxcontrib.slide
+  shell: cd {{ sphinx_virtualenv }}/sphinx-contrib/slide && sudo {{ sphinx_virtualenv }}/bin/python setup.py install
+
+- name: Install sphinxcontrib.youtube
+  shell: cd {{ sphinx_virtualenv }}/sphinx-contrib/youtube && sudo {{ sphinx_virtualenv }}/bin/python setup.py install

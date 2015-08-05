@@ -7,7 +7,7 @@ This document describes how to install a personal Sphinx documentation server.
 Requirements
 ============
 
-- `Ansible <http://docs.ansible.com/>`_. We use Ansible to easily deploy Pootle and scripts to the server.
+- `Ansible <http://docs.ansible.com/>`_. We use Ansible to easily deploy Sphinx and scripts to the server.
   The deployment receipes and scripts are found in this Git project.
 
 - Linux server. We will use a blank `Debian AMD64 <https://www.debian.org/CD/netinst/>`_ virtual
@@ -18,7 +18,7 @@ Requirements
 Installing Ansible
 ------------------
 
-Ansible is needed on a so-called "Control Machine"; that is, a computer that will control the Pootle
+Ansible is needed on a so-called "Control Machine"; that is, a computer that will control the Sphinx
 server. This is typically your personal computer.
 
 We will install Ansible from source since this is the recommended method. Just pick your preferred

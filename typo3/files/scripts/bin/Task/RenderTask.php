@@ -704,6 +704,11 @@ EOT;
 		$lines = explode(LF, $contents);
 		$pythonConfiguration = array();
 
+		// Remove empty lines and comments
+		$lines = array_values(array_filter($lines, function ($line) {
+			return !(trim($line) === '' || preg_match('/^\\s*#/', $line));
+		}));
+
 		$i = 0;
 		while ($lines[$i] !== 'conf.py:' && $i < count($lines)) {
 			$i++;

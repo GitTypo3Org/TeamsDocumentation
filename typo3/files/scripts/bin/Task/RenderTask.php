@@ -740,7 +740,7 @@ EOT;
 								$pythonLine .= sprintf('\'%s\': ', $matches[1]);
 								if ($matches[2] === 'null') {
 									$pythonLine .= 'None';
-								} elseif (/*GeneralUtility*/static::inList('true,false', $matches[2])) {
+								} elseif (/*GeneralUtility*/static::inList('true,false', strtolower($matches[2]))) {
 									$pythonLine .= ucfirst($matches[2]);
 								} elseif (/*\TYPO3\CMS\Core\Utility\MathUtility*/static::canBeInterpretedAsInteger($matches[2])) {
 									$pythonLine .= intval($matches[2]);
@@ -806,7 +806,16 @@ EOT;
 						$i--;
 					break;
 					default:
-						$pythonLine = sprintf('%s = u\'%s\'', $matches[2], addcslashes($matches[3], "\\'"));
+						$pythonLine = $matches[2] . ' = ';
+						if ($matches[3] === 'null') {
+							$pythonLine .= 'None';
+						} elseif (/*GeneralUtility*/static::inList('true,false', strtolower($matches[3]))) {
+							$pythonLine .= ucfirst($matches[3]);
+						} elseif (/*\TYPO3\CMS\Core\Utility\MathUtility*/static::canBeInterpretedAsInteger($matches[3])) {
+							$pythonLine .= intval($matches[3]);
+						} else {
+							$pythonLine .= sprintf('u\'%s\'', addcslashes($matches[3], "\\'"));
+						}
 					break;
 				}
 				if (!empty($pythonLine)) {

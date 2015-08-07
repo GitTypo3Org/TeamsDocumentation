@@ -810,6 +810,10 @@ EOT;
 						$pythonLine .= LF . '}';
 						$i--;
 					break;
+					case 'version':
+					case 'release':
+						$pythonLine = sprintf('%s = u\'%s\'', $matches[2], addcslashes($matches[3], "\\'"));
+						break;
 					default:
 						$pythonLine = $matches[2] . ' = ';
 						if ($matches[3] === 'null') {

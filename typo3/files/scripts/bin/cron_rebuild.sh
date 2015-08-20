@@ -341,7 +341,7 @@ function renderdocumentation() {
     # Create other versions of the documentation
     # make -e gettext
     # make -e json
-    make -e singlehtml
+    # make -e singlehtml
     # make -e dirhtml
 
     # Provide a _make directory in public_html to access

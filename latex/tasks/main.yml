@@ -41,5 +41,5 @@
   args:
      creates: /usr/local/share/texmf/tex/latex/cm-super
 
-- name: Update Tex Live packages
+- name: Update TeX Live packages
   shell: sudo tlmgr --usertree /usr/local/share/texmf update --all

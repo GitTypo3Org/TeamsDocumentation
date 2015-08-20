@@ -11,24 +11,6 @@
 - name: Install pandoc
   apt: pkg=pandoc state=installed
 
-- name: Install LibreOffice
-  apt: pkg=libreoffice state=installed
-
-- name: Install python-uno
-  pip: name=uno virtualenv={{ sphinx_virtualenv }}
-
-- name: Install PyODConverter
-  pip: name=PyODConverter virtualenv={{ sphinx_virtualenv }}
-
-- name: Create a daemon user libreoffice
-  user: name=libreoffice comment="LibreOffice server daemon" system=yes state=present home=/nonexistent createhome=no shell=/usr/bin/nologin
-
-- name: Set up init.d scripts for LibreOffice-headless
-  template: src=libreoffice-headless.j2 dest=/etc/init.d/libreoffice-headless owner=root group=root mode=0755
-
-- name: Start LibreOffice-headless
-  service: name=libreoffice-headless enabled=yes state=started
-
 - name: Install Sphinx user profile
   template: src=bash_profile.j2 dest=/home/sphinx/.bash_profile owner=sphinx group=sphinx
 

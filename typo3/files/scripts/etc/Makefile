@@ -45,15 +45,15 @@ help:
 	@echo "  doctest    to run all doctests embedded in the documentation (if enabled)"
 
 clean:
-	-rm objects.inv
-	-cp -p $(BUILDDIR)/objects.inv .
-	-rm -rf $(BUILDDIR)/*
-	-rm -rf $(BUILDDIR)/.buildinfo
-	-cp -p objects.inv $(BUILDDIR)
+	rm objects.inv
+	cp -p $(BUILDDIR)/objects.inv .
+	rm -rf $(BUILDDIR)/*
+	rm -rf $(BUILDDIR)/.buildinfo
+	cp -p objects.inv $(BUILDDIR)
 
 html:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)
-	cp -p warnings.txt $(BUILDDIR)
+	if [ -f warnings.txt ]; then cp -p warnings.txt $(BUILDDIR); fi
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)."
 
@@ -64,7 +64,7 @@ dirhtml:
 
 singlehtml:
 	$(SPHINXBUILD) -b singlehtml $(ALLSPHINXOPTS) $(BUILDDIR)/singlehtml
-	cp -p warnings.txt $(BUILDDIR)/singlehtml
+	if [ -f warnings.txt ]; then cp -p warnings.txt $(BUILDDIR)/singlehtml; fi
 	@echo
 	@echo "Build finished. The HTML page is in $(BUILDDIR)/singlehtml."
 
@@ -75,7 +75,7 @@ pickle:
 
 json:
 	$(SPHINXBUILD) -b json $(ALLSPHINXOPTS) $(BUILDDIR)/json
-	cp -p warnings.txt $(BUILDDIR)
+	if [ -f warnings.txt ]; then cp -p warnings.txt $(BUILDDIR); fi
 	@echo
 	@echo "Build finished; now you can process the JSON files."
 

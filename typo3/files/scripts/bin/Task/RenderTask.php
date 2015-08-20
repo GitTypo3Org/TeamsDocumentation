@@ -31,331 +31,391 @@ define('LF', "\n");
  *
  * @author Xavier Perseguers <xavier@causal.ch>
  */
-class RenderTask {
+class RenderTask
+{
 
-	const SIZE_THRESHOLD = 1500;	// bytes, about 2 paragraphs of "Lorem Ipsum"
+    const SIZE_THRESHOLD = 1500;    // bytes, about 2 paragraphs of "Lorem Ipsum"
 
-	const DOCUMENTATION_TYPE_UNKNOWN    = 0;
-	const DOCUMENTATION_TYPE_SPHINX     = 1;
-	const DOCUMENTATION_TYPE_README     = 2;
-	const DOCUMENTATION_TYPE_OPENOFFICE = 3;
-	const DOCUMENTATION_TYPE_MARKDOWN   = 4;
+    const DOCUMENTATION_TYPE_UNKNOWN = 0;
+    const DOCUMENTATION_TYPE_SPHINX = 1;
+    const DOCUMENTATION_TYPE_README = 2;
+    const DOCUMENTATION_TYPE_OPENOFFICE = 3;
+    const DOCUMENTATION_TYPE_MARKDOWN = 4;
 
-	/**
-	 * Runs this task.
-	 *
-	 * @return void
-	 */
-	public function run() {
-		$queueDirectory = rtrim($GLOBALS['CONFIG']['DIR']['work'], '/') . '/queue/';
-		$renderDirectory = rtrim($GLOBALS['CONFIG']['DIR']['work'], '/') . '/render/';
+    /**
+     * Runs this task.
+     *
+     * @return void
+     */
+    public function run()
+    {
+        $queueDirectory = rtrim($GLOBALS['CONFIG']['DIR']['work'], '/') . '/queue/';
+        $renderDirectory = rtrim($GLOBALS['CONFIG']['DIR']['work'], '/') . '/render/';
+        $extensionKeys = $this->get_dirs($queueDirectory);
 
-		$extensionKeys = $this->get_dirs($queueDirectory);
-		foreach ($extensionKeys as $extensionKey) {
-			$extensionDirectory = $queueDirectory . $extensionKey . '/';
-			$versions = $this->get_dirs($extensionDirectory);
+        foreach ($extensionKeys as $extensionKey) {
+            $extensionDirectory = $queueDirectory . $extensionKey . '/';
+            $versions = $this->get_dirs($extensionDirectory);
 
-			if (!count($versions)) {
-				echo '   [INFO] No version found for ' . $extensionKey . ': removing from queue' . LF;
-				exec('rm -rf ' . $extensionDirectory);
-				continue;
-			}
+            if (!count($versions)) {
+                echo '   [INFO] No version found for ' . $extensionKey . ': removing from queue' . LF;
+                exec('rm -rf ' . $extensionDirectory);
+                continue;
+            }
 
-			$baseBuildDirectory = rtrim($GLOBALS['CONFIG']['DIR']['publish'], '/') . '/' . $extensionKey . '/';
+            $basePublishDirectory = rtrim($GLOBALS['CONFIG']['DIR']['publish'], '/') . '/' . $extensionKey . '/';
 
-			foreach ($versions as $version) {
-				echo '   [INFO] Processing ' . $extensionKey . ' v.' . $version . LF;
-				$versionDirectory = $extensionDirectory . $version . '/';
-				$buildDirectory = $baseBuildDirectory . $version;
+            foreach ($versions as $version) {
+                echo '   [INFO] Processing ' . $extensionKey . ' v.' . $version . LF;
+                $versionDirectory = $extensionDirectory . $version . '/';
+                $publishDirectory = $basePublishDirectory . $version;
 
-				if (preg_match('/^\d+\.\d+\.\d+$/', $version)) {
-					if (is_file($versionDirectory . 'Documentation/Index.rst')) {
-						$documentationType = static::DOCUMENTATION_TYPE_SPHINX;
+                if (preg_match('/^\d+\.\d+\.\d+$/', $version)) {
+                    if (is_file($versionDirectory . 'Documentation/Index.rst')) {
+                        $documentationType = static::DOCUMENTATION_TYPE_SPHINX;
 
-						if (is_file($versionDirectory . 'Documentation/_Fr/UserManual.rst')) {
-							// This is most probably a garbage documentation coming from the old
-							// documentation template and automatically included with the Extension Builder
-							echo '[WARNING] Garbage documentation from template found: skipping rendering' . LF;
-							$documentationType = static::DOCUMENTATION_TYPE_UNKNOWN;
-						}
-					} elseif (is_file($versionDirectory . 'README.rst') && filesize($versionDirectory . 'README.rst') > static::SIZE_THRESHOLD) {
-						$documentationType = static::DOCUMENTATION_TYPE_README;
-					} elseif (is_file($versionDirectory . 'README.md') && filesize($versionDirectory . 'README.md') > static::SIZE_THRESHOLD && !empty($GLOBALS['CONFIG']['BIN']['pandoc'])) {
-						$documentationType = static::DOCUMENTATION_TYPE_MARKDOWN;
-					} elseif (is_file($versionDirectory . 'doc/manual.sxw')) {
-						$documentationType = static::DOCUMENTATION_TYPE_OPENOFFICE;
-					} else {
-						$documentationType = static::DOCUMENTATION_TYPE_UNKNOWN;
-					}
-					switch ($documentationType) {
+                        if (is_file($versionDirectory . 'Documentation/_Fr/UserManual.rst')) {
+                            // This is most probably a garbage documentation coming from the old
+                            // documentation template and automatically included with the Extension Builder
+                            echo '[WARNING] Garbage documentation from template found: skipping rendering' . LF;
+                            $documentationType = static::DOCUMENTATION_TYPE_UNKNOWN;
+                        }
+                    } elseif (is_file($versionDirectory . 'README.rst') && filesize($versionDirectory . 'README.rst') > static::SIZE_THRESHOLD) {
+                        $documentationType = static::DOCUMENTATION_TYPE_README;
+                    } elseif (is_file($versionDirectory . 'README.md') && filesize($versionDirectory . 'README.md') > static::SIZE_THRESHOLD && !empty($GLOBALS['CONFIG']['BIN']['pandoc'])) {
+                        $documentationType = static::DOCUMENTATION_TYPE_MARKDOWN;
+                    } elseif (is_file($versionDirectory . 'doc/manual.sxw')) {
+                        $documentationType = static::DOCUMENTATION_TYPE_OPENOFFICE;
+                    } else {
+                        $documentationType = static::DOCUMENTATION_TYPE_UNKNOWN;
+                    }
 
-						// ---------------------------------
-						// Sphinx documentation
-						// ---------------------------------
-						case static::DOCUMENTATION_TYPE_SPHINX:
-							echo ' [RENDER] ' . $extensionKey . ' ' . $version . ' (Sphinx project)' . LF;
+                    switch ($documentationType) {
 
-							// Clean-up render directory
-							$this->cleanUpDirectory($renderDirectory);
+                        // ---------------------------------
+                        // Sphinx documentation
+                        // ---------------------------------
+                        case static::DOCUMENTATION_TYPE_SPHINX:
+                            $this->renderSphinxProject($extensionKey, $version, $versionDirectory, $renderDirectory, $publishDirectory, $documentationType);
+                            break;
 
-							if (!is_file($versionDirectory . 'Documentation/Settings.yml')) {
-								// Detect if author automatically converted from OOo manual without
-								// taking care of cleaning it up (a bit)
-								// Trigger is the invalid modification date/creation date of the form
-								// 2013-10-04 15::5:0:
-								$isLegacy = FALSE;
-								if (is_file($versionDirectory . 'Documentation/Index.rst')) {
-									$contents = file_get_contents($versionDirectory . 'Documentation/Index.rst');
-									if (preg_match('/\\s+\\d{4}-\\d{2}-\\d{2} .*::/', $contents, $matches)) {
-										$isLegacy = TRUE;
-									}
-								}
-								$this->createSettingsYml($versionDirectory, $extensionKey, $isLegacy);
-							}
+                        // ---------------------------------
+                        // README.rst documentation
+                        // ---------------------------------
+                        case static::DOCUMENTATION_TYPE_README:
+                            $this->renderReadmeRst($extensionKey, $version, $versionDirectory, $renderDirectory, $publishDirectory, $documentationType);
+                            break;
 
-							// Fix version/release in Settings.yml
-							$this->overrideVersionAndReleaseInSettingsYml($versionDirectory, $version);
+                        // ---------------------------------
+                        // README.md documentation
+                        // ---------------------------------
+                        case static::DOCUMENTATION_TYPE_MARKDOWN:
+                            $success = $this->convertReadmeMd($extensionKey, $version, $versionDirectory);
+                            if ($success) {
+                                $this->renderReadmeRst($extensionKey, $version, $versionDirectory, $renderDirectory, $publishDirectory, $documentationType);
+                            }
+                            break;
 
-							$this->createConfPy(
-								$extensionKey,
-								$version,
-								$renderDirectory,
-								'Documentation/'
-							);
+                        // ---------------------------------
+                        // OpenOffice documentation
+                        // ---------------------------------
+                        case static::DOCUMENTATION_TYPE_OPENOFFICE:
+                            $success = $this->convertManualSxw($extensionKey, $version, $versionDirectory);
+                            if ($success) {
+                                $this->renderReadmeRst($extensionKey, $version, $versionDirectory, $renderDirectory, $publishDirectory, $documentationType);
+                            }
+                            break;
 
-							$this->createCronRebuildConf(
-								$extensionKey,
-								$version,
-								$buildDirectory,
-								$renderDirectory,
-								$versionDirectory,
-								'Documentation/'
-							);
+                        default:
+                            echo '[WARNING] Unknown documentation format: skipping rendering' . LF;
+                            break;
+                    }
+                }
 
-							$this->renderProject($renderDirectory);
-							if (!is_file($buildDirectory . '/Index.html')) {
-								echo '[WARNING] Cannot find file ' . $buildDirectory . '/Index.html' . LF;
-							} else {
-								$this->addReference($extensionKey, $documentationType, $version, $versionDirectory, $buildDirectory);
-								$this->updateListOfExtensions($extensionKey, $buildDirectory);
-							}
-							break;
+                $this->removeFromQueue($extensionKey, $version);
+                sleep(5);
+            }
 
-						// ---------------------------------
-						// README.md documentation
-						// ---------------------------------
-						case static::DOCUMENTATION_TYPE_MARKDOWN:
-							echo ' [CONVERT] ' . $extensionKey . ' ' . $version . ' (Markdown)' . LF;
+            /*
+            // Put .htaccess for the extension if needed
+            if (is_dir($baseBuildDirectory) && !is_file($baseBuildDirectory . '.htaccess')) {
+                symlink(rtrim($GLOBALS['CONFIG']['DIR']['scripts'], '/') . '/config/_htaccess', $baseBuildDirectory . '.htaccess');
+            }
+            */
 
-							$cmd = $GLOBALS['CONFIG']['BIN']['pandoc'] .
-								' -f markdown -t rst' .
-								' -o ' . escapeshellarg($versionDirectory . 'README.rst') .
-								' ' . escapeshellarg($versionDirectory . 'README.md');
-							$output = array();
-							$exitCode = 0;
-							$success = exec($cmd, $output, $exitCode);
+        }
 
-							if ($success != 0) break;
-							// NO BREAK HERE TO CONTINUE WITH "README"
+    }
 
-						// ---------------------------------
-						// README.rst documentation
-						// ---------------------------------
-						case static::DOCUMENTATION_TYPE_README:
-							echo ' [RENDER] ' . $extensionKey . ' ' . $version . ' (simple README)' . LF;
+    /**
+     * Renders a Sphinx project.
+     *
+     * @param string $extensionKey Extension
+     * @param string $version Version of the extension
+     * @param string $versionDirectory Root directory for the $extensionKey / $version pair
+     * @param string $renderDirectory Temporary directory used to render the documentation
+     * @param string $publishDirectory Publish directory where rendered documentation will be copied to
+     * @param int $documentationType
+     * @return bool true if render succeeded, otherwise false
+     */
+    protected function renderSphinxProject($extensionKey, $version, $versionDirectory, $renderDirectory, $publishDirectory, $documentationType)
+    {
+        $success = false;
+        echo ' [RENDER] ' . $extensionKey . ' ' . $version . ' (Sphinx project)' . LF;
 
-							// Clean-up render directory
-							$this->cleanUpDirectory($renderDirectory);
+        // Clean-up render directory
+        $this->cleanUpDirectory($renderDirectory);
 
-							$this->createConfPy(
-								$extensionKey,
-								$version,
-								$renderDirectory,
-								'',
-								'README'
-							);
+        if (!is_file($versionDirectory . 'Documentation/Settings.yml')) {
+            $this->createSettingsYml($versionDirectory, $extensionKey);
+        }
 
-							$this->createCronRebuildConf(
-								$extensionKey,
-								$version,
-								$buildDirectory,
-								$renderDirectory,
-								$versionDirectory,
-								''
-							);
+        // Fix version/release in Settings.yml
+        $this->overrideVersionAndReleaseInSettingsYml($versionDirectory, $version);
 
-							// We lack a Settings.yml file
-							$this->createSettingsYml($versionDirectory, $extensionKey);
+        $this->createConfPy(
+            $extensionKey,
+            $version,
+            $renderDirectory,
+            'Documentation/'
+        );
 
-							// Fix version/release in Settings.yml
-							$this->overrideVersionAndReleaseInSettingsYml($versionDirectory, $version);
+        $this->createCronRebuildConf(
+            $extensionKey,
+            $version,
+            $publishDirectory,
+            $renderDirectory,
+            $versionDirectory,
+            'Documentation/'
+        );
 
-							$this->renderProject($renderDirectory);
-							if (!is_file($buildDirectory . '/Index.html')) {
-								echo '[WARNING] Cannot find file ' . $buildDirectory . '/Index.html' . LF;
-							} else {
-								$this->addReference($extensionKey, $documentationType, $version, $versionDirectory, $buildDirectory);
-								$this->updateListOfExtensions($extensionKey, $buildDirectory);
-							}
-							break;
+        $this->renderProject($renderDirectory);
+        if (!is_file($publishDirectory . '/Index.html')) {
+            echo '[WARNING] Cannot find file ' . $publishDirectory . '/Index.html' . LF;
+        } else {
+            $this->addReference($extensionKey, $documentationType, $version, $versionDirectory, $publishDirectory);
+            $this->updateListOfExtensions($extensionKey, $publishDirectory);
+            $success = true;
+        }
 
-						// ---------------------------------
-						// OpenOffice documentation
-						// ---------------------------------
-						case static::DOCUMENTATION_TYPE_OPENOFFICE:
-							echo ' [RENDER] ' . $extensionKey . ' ' . $version . ' (OpenOffice)' . LF;
+        return $success;
+    }
 
-							// Clean-up render directory
-							$this->cleanUpDirectory($renderDirectory);
+    /**
+     * Renders a README.rst file.
+     *
+     * @param string $extensionKey Extension
+     * @param string $version Version of the extension
+     * @param string $versionDirectory Root directory for the $extensionKey / $version pair
+     * @param string $renderDirectory Temporary directory used to render the documentation
+     * @param string $publishDirectory Publish directory where rendered documentation will be copied to
+     * @param int $documentationType
+     * @return bool true if render succeeded, otherwise false
+     */
+    protected function renderReadmeRst($extensionKey, $version, $versionDirectory, $renderDirectory, $publishDirectory, $documentationType)
+    {
+        $success = false;
+        echo ' [RENDER] ' . $extensionKey . ' ' . $version . ' (simple README)' . LF;
 
-							// Convert OpenOffice to Sphinx
-							$manualFilename = $versionDirectory . 'doc/manual.sxw';
-							$cmd = 'python ' .
-								$GLOBALS['CONFIG']['DIR']['scripts'] . '/OpenOffice2Sphinx/t3pdb_sxw2html.py ' .
-								escapeshellarg($manualFilename) . ' ' .
-								escapeshellarg($renderDirectory);
-							exec($cmd);
+        // Clean-up render directory
+        $this->cleanUpDirectory($renderDirectory);
 
-							if (!is_file($renderDirectory . 't3pdb/Documentation/Index.rst')) {
-								echo '  [ERROR] Conversion from manual.sxw failed' . LF;
-							} else {
-								// Move the generated Sphinx project to the original extension directory
-								exec('rm -rf ' . escapeshellarg($versionDirectory) . 'Documentation');
-								exec('mv ' . escapeshellarg($renderDirectory . 't3pdb/Documentation') . ' ' . escapeshellarg($versionDirectory));
+        $this->createConfPy(
+            $extensionKey,
+            $version,
+            $renderDirectory,
+            '',
+            'README'
+        );
 
-								if (!is_file($versionDirectory . 'Documentation/Includes.txt')) {
-									// This file is often needed, and may crash the rendering if it is not there.
-									// This is most probably a bug in the OOo converter
-									exec('touch ' . escapeshellarg($versionDirectory . 'Documentation/Includes.txt'));
-								}
-								if (!is_file($versionDirectory . 'Documentation/Targets.rst')) {
-									// This file is often needed, and may crash the rendering if it is not there.
-									// This is most probably a bug in the OOo converter
-									exec('touch ' . escapeshellarg($versionDirectory . 'Documentation/Targets.rst'));
-								}
+        $this->createCronRebuildConf(
+            $extensionKey,
+            $version,
+            $publishDirectory,
+            $renderDirectory,
+            $versionDirectory,
+            ''
+        );
 
-								// We now lack a Settings.yml file
-								$this->createSettingsYml($versionDirectory, $extensionKey, TRUE);
+        // We lack a Settings.yml file
+        $this->createSettingsYml($versionDirectory, $extensionKey);
 
-								// ---------------------------------
-								// Sphinx from OOo documentation
-								// ---------------------------------
+        // Fix version/release in Settings.yml
+        $this->overrideVersionAndReleaseInSettingsYml($versionDirectory, $version);
 
-								// Clean-up render directory
-								$this->cleanUpDirectory($renderDirectory);
+        $this->renderProject($renderDirectory);
+        if (!is_file($publishDirectory . '/Index.html')) {
+            echo '[WARNING] Cannot find file ' . $publishDirectory . '/Index.html' . LF;
+        } else {
+            $this->addReference($extensionKey, $documentationType, $version, $versionDirectory, $publishDirectory);
+            $this->updateListOfExtensions($extensionKey, $publishDirectory);
+            $success = true;
+        }
 
-								// Fix version/release in Settings.yml
-								$this->overrideVersionAndReleaseInSettingsYml($versionDirectory, $version);
+        return $success;
+    }
 
-								$this->createConfPy(
-									$extensionKey,
-									$version,
-									$renderDirectory,
-									'Documentation/'
-								);
+    /**
+     * Converts a README.md file to reStructuredText format (README.rst in same directory).
+     *
+     * @param string $extensionKey Extension
+     * @param string $version Version of the extension
+     * @param string $versionDirectory Root directory for the $extensionKey / $version pair
+     * @return bool true if conversion succeeded, otherwise false
+     */
+    protected function convertReadmeMd($extensionKey, $version, $versionDirectory)
+    {
+        echo '[CONVERT] ' . $extensionKey . ' ' . $version . ' (Markdown)' . LF;
 
-								$this->createCronRebuildConf(
-									$extensionKey,
-									$version,
-									$buildDirectory,
-									$renderDirectory,
-									$versionDirectory,
-									'Documentation/',
-									FALSE
-								);
+        $cmd = $GLOBALS['CONFIG']['BIN']['pandoc'] .
+            ' -f markdown -t rst' .
+            ' -o ' . escapeshellarg($versionDirectory . 'README.rst') .
+            ' ' . escapeshellarg($versionDirectory . 'README.md');
+        $output = array();
+        $exitCode = 0;
+        exec($cmd, $output, $exitCode);
 
-								$this->renderProject($renderDirectory);
-								if (!is_file($buildDirectory . '/Index.html')) {
-									echo '[WARNING] Cannot find file ' . $buildDirectory . '/Index.html' . LF;
-								} else {
-									$this->addReference($extensionKey, $documentationType, $version, $versionDirectory, $buildDirectory);
-									$this->updateListOfExtensions($extensionKey, $buildDirectory);
-								}
-							}
-							break;
+        return $exitCode === 0;
+    }
 
-						default:
-							echo '[WARNING] Unknown documentation format: skipping rendering' . LF;
-							break;
-					}
-				}
+    /**
+     * "Converts" a manual.sxw file to a simple README.rst file.
+     *
+     * @param string $extensionKey Extension
+     * @param string $version Version of the extension
+     * @param string $versionDirectory Root directory for the $extensionKey / $version pair
+     * @return bool true if conversion succeeded, otherwise false
+     */
+    protected function convertManualSxw($extensionKey, $version, $versionDirectory)
+    {
+        echo '[CONVERT] ' . $extensionKey . ' ' . $version . ' (OpenOffice)' . LF;
 
-				$this->removeFromQueue($extensionKey, $version);
-				sleep(5);
-			}
+        // Create a simple file README.rst
+        $title = $extensionKey . ' v' . $version;
+        $underline = str_repeat('=', strlen($title));
+        $contents = <<<REST
+$underline
+$title
+$underline
 
-			/*
-			// Put .htaccess for the extension if needed
-			if (is_dir($baseBuildDirectory) && !is_file($baseBuildDirectory . '.htaccess')) {
-				symlink(rtrim($GLOBALS['CONFIG']['DIR']['scripts'], '/') . '/config/_htaccess', $baseBuildDirectory . '.htaccess');
-			}
-			*/
+.. admonition:: Oh my! That's too bad!
+	:class: warning
 
-		}
+	Unfortunately the author of $extensionKey is still relying on an outdated
+	OpenOffice extension manual instead of providing a Sphinx-based documentation.
 
-	}
+	After years of support, the TYPO3 documentation team finally discontinued
+	supporting this legacy format of extension manual.
 
-	/**
-	 * Overrides the version and release in Settings.yml (because developers simply tend to forget about
-	 * adapting this info prior to uploading their extension to TER).
-	 *
-	 * @param string $path
-	 * @param string $version
-	 * @return void
-	 */
-	protected function overrideVersionAndReleaseInSettingsYml($path, $version) {
-		$path = rtrim($path, '/') . '/';
-		if (is_dir($path . 'Documentation')) {
-			$filenames = array('Documentation/Settings.yml');
+	We are sorry for the inconvenience.
 
-			// Search for other translated versions of Settings.yml
-			$directories = $this->get_dirs($path . 'Documentation/');
-			foreach ($directories as $directory) {
-				if (preg_match('/^Localization\./', $directory)) {
-					$localizationDirectory = $path . 'Documentation/' . $directory . '/Settings.yml';
-					if (!is_file($localizationDirectory)) {
-						copy($path . 'Documentation/Settings.yml', $localizationDirectory);
-					}
-					$filenames[] = 'Documentation/' . $directory . '/Settings.yml';
-				}
-			}
-		} else {
-			$filenames = array('Settings.yml');
-		}
 
-		// release is actually the "version" from TER
-		$release = $version;
-		// whereas version is a two digit alternative of the release number
-		$parts = explode('.', $release);
-		$version = $parts[0] . '.' . $parts[1];
+Converting OpenOffice to Sphinx
+-------------------------------
 
-		foreach ($filenames as $filename) {
-			$contents = file_get_contents($path . $filename);
-			$contents = preg_replace('/^(\s+version): (.*)/m', '\1: ' . $version, $contents);
-			$contents = preg_replace('/^(\s+release): (.*)$/m', '\1: ' . $release, $contents);
-			file_put_contents($path . $filename, $contents);
-		}
-	}
+It is now due time for the extension author to live in the present century
+and switch to Sphinx instead of relying on OpenOffice.
 
-	/**
-	 * Creates a default Settings.yml configuration file.
-	 *
-	 * @param string $extensionDirectory
-	 * @param string $extensionKey
-	 * @param bool $isLegacy
-	 * @return void
-	 */
-	protected function createSettingsYml($extensionDirectory, $extensionKey, $isLegacy = FALSE) {
-		$extensionDirectory = rtrim($extensionDirectory, '/') . '/';
+The TYPO3 documentation team encourages the extension author to use the
+built-in OpenOffice to Sphinx converter available with EXT:sphinx, available
+on `https://typo3.org/extensions/repository/view/sphinx <https://typo3.org/extensions/repository/view/sphinx>`__.
 
-		$_EXTKEY = $extensionKey;
-		$EM_CONF = array();
-		include($extensionDirectory . 'ext_emconf.php');
-		$copyright = date('Y');
-		$title = $EM_CONF[$_EXTKEY]['title'];
-		$isLegacy = $isLegacy ? 'true' : 'false';
 
-		$configuration = <<<YAML
+Advantages of using Sphinx
+--------------------------
+
+They are numerous advantages of the Sphinx documentation format:
+
+- **Output formats:** Sphinx projects may be automatically rendered as HTML or
+  TYPO3-branded PDF.
+- **Cross-references:** It is easy to cross-reference other chapters and sections
+  of other manuals (either TYPO3 references or extension manuals).
+- **Multilingual:** Unlike OpenOffice, Sphinx projects may be easily localized
+  and automatically presented in the most appropriate language to TYPO3 users.
+- **Collaboration:** As the documentation is plain text, it is easy to work as
+  a team on the same manual or quickly review changes using any versioning system.
+
+Please read https://docs.typo3.org/typo3cms/CoreApiReference/ExtensionArchitecture/Documentation/Index.html
+for more information on how adding documentation to a TYPO3 extension projet.
+
+Kind Regards
+
+For the documentation team:
+
+| Xavier Perseguers
+| TYPO3 CMS Team
+|
+| TYPO3 ... inspiring people to share
+| Get involved: https://typo3.org
+|
+
+REST;
+        file_put_contents($versionDirectory . 'README.rst', $contents);
+
+        return true;
+    }
+
+    /**
+     * Overrides the version and release in Settings.yml (because developers simply tend to forget about
+     * adapting this info prior to uploading their extension to TER).
+     *
+     * @param string $path
+     * @param string $version
+     * @return void
+     */
+    protected function overrideVersionAndReleaseInSettingsYml($path, $version)
+    {
+        $path = rtrim($path, '/') . '/';
+        if (is_dir($path . 'Documentation')) {
+            $filenames = array('Documentation/Settings.yml');
+
+            // Search for other translated versions of Settings.yml
+            $directories = $this->get_dirs($path . 'Documentation/');
+            foreach ($directories as $directory) {
+                if (preg_match('/^Localization\./', $directory)) {
+                    $localizationDirectory = $path . 'Documentation/' . $directory . '/Settings.yml';
+                    if (!is_file($localizationDirectory)) {
+                        copy($path . 'Documentation/Settings.yml', $localizationDirectory);
+                    }
+                    $filenames[] = 'Documentation/' . $directory . '/Settings.yml';
+                }
+            }
+        } else {
+            $filenames = array('Settings.yml');
+        }
+
+        // release is actually the "version" from TER
+        $release = $version;
+        // whereas version is a two digit alternative of the release number
+        $parts = explode('.', $release);
+        $version = $parts[0] . '.' . $parts[1];
+
+        foreach ($filenames as $filename) {
+            $contents = file_get_contents($path . $filename);
+            $contents = preg_replace('/^(\s+version): (.*)/m', '\1: ' . $version, $contents);
+            $contents = preg_replace('/^(\s+release): (.*)$/m', '\1: ' . $release, $contents);
+            file_put_contents($path . $filename, $contents);
+        }
+    }
+
+    /**
+     * Creates a default Settings.yml configuration file.
+     *
+     * @param string $extensionDirectory
+     * @param string $extensionKey
+     * @return void
+     */
+    protected function createSettingsYml($extensionDirectory, $extensionKey)
+    {
+        $extensionDirectory = rtrim($extensionDirectory, '/') . '/';
+
+        $_EXTKEY = $extensionKey;
+        $EM_CONF = array();
+        include($extensionDirectory . 'ext_emconf.php');
+        $copyright = date('Y');
+        $title = $EM_CONF[$_EXTKEY]['title'];
+
+        $configuration = <<<YAML
 # This is the project specific Settings.yml file.
 # Place Sphinx specific build information here.
 # Settings given here will replace the settings of 'conf.py'.
@@ -366,55 +426,55 @@ conf.py:
   project: $title
   version: 1.0
   release: 1.0.0
-  html_theme_options:
-    legacy_source_format: $isLegacy
 ...
 
 YAML;
-		$targetDirectory = is_dir($extensionDirectory . 'Documentation') ? $extensionDirectory . 'Documentation' : $extensionDirectory;
-		file_put_contents($targetDirectory .  '/Settings.yml', $configuration);
-	}
+        $targetDirectory = is_dir($extensionDirectory . 'Documentation') ? $extensionDirectory . 'Documentation' : $extensionDirectory;
+        file_put_contents($targetDirectory . '/Settings.yml', $configuration);
+    }
 
-	/**
-	 * Creates a conf.py configuration file.
-	 *
-	 * @param string $extensionKey
-	 * @param string $version
-	 * @param string $renderDirectory
-	 * @param string $prefix Optional prefix directory ("Documentation/")
-	 * @param string $masterDocument
-	 * @return void
-	 */
-	protected function createConfPy($extensionKey, $version, $renderDirectory, $prefix, $masterDocument = 'Index') {
-	    $replacements = array(
-			'###DOCUMENTATION_RELPATH###' => '../queue/' . $extensionKey . '/' . $version . '/' . $prefix,
-			'###MASTER_DOC###' => $masterDocument,
-		);
-		$contents = file_get_contents(dirname(__FILE__) . '/../../etc/conf.py');
-		$contents = str_replace(
-			array_keys($replacements),
-			array_values($replacements),
-			$contents
-		);
-		file_put_contents($renderDirectory . 'conf.py', $contents);
-	}
+    /**
+     * Creates a conf.py configuration file.
+     *
+     * @param string $extensionKey
+     * @param string $version
+     * @param string $renderDirectory
+     * @param string $prefix Optional prefix directory ("Documentation/")
+     * @param string $masterDocument
+     * @return void
+     */
+    protected function createConfPy($extensionKey, $version, $renderDirectory, $prefix, $masterDocument = 'Index')
+    {
+        $replacements = array(
+            '###DOCUMENTATION_RELPATH###' => '../queue/' . $extensionKey . '/' . $version . '/' . $prefix,
+            '###MASTER_DOC###' => $masterDocument,
+        );
+        $contents = file_get_contents(dirname(__FILE__) . '/../../etc/conf.py');
+        $contents = str_replace(
+            array_keys($replacements),
+            array_values($replacements),
+            $contents
+        );
+        file_put_contents($renderDirectory . 'conf.py', $contents);
+    }
 
-	/**
-	 * Creates a cron_rebuild.conf configuration file.
-	 *
-	 * @param string $extensionKey
-	 * @param string $version
-	 * @param string $buildDirectory
-	 * @param string $renderDirectory
-	 * @param string $versionDirectory
-	 * @param string $prefix Optional prefix directory ("Documentation/")
-	 * @param boolean $createArchive
-	 * @return void
-	 */
-	protected function createCronRebuildConf($extensionKey, $version, $buildDirectory, $renderDirectory, $versionDirectory, $prefix, $createArchive = TRUE) {
-		$packageZip = $createArchive ? '1' : '0';
+    /**
+     * Creates a cron_rebuild.conf configuration file.
+     *
+     * @param string $extensionKey
+     * @param string $version
+     * @param string $buildDirectory
+     * @param string $renderDirectory
+     * @param string $versionDirectory
+     * @param string $prefix Optional prefix directory ("Documentation/")
+     * @param boolean $createArchive
+     * @return void
+     */
+    protected function createCronRebuildConf($extensionKey, $version, $buildDirectory, $renderDirectory, $versionDirectory, $prefix, $createArchive = TRUE)
+    {
+        $packageZip = $createArchive ? '1' : '0';
 
-		$contents = <<<EOT
+        $contents = <<<EOT
 PROJECT=$extensionKey
 VERSION=$version
 TER_EXTENSION=1
@@ -436,445 +496,466 @@ PACKAGE_KEY=typo3cms.extensions.$extensionKey
 PACKAGE_LANGUAGE=default
 EOT;
 
-		file_put_contents($renderDirectory . 'cron_rebuild.conf', $contents);
-	}
+        file_put_contents($renderDirectory . 'cron_rebuild.conf', $contents);
+    }
 
-	/**
-	 * Renders a Sphinx project.
-	 *
-	 * @param string $renderDirectory
-	 * @return void
-	 */
-	protected function renderProject($renderDirectory) {
-		$renderDirectory = rtrim($renderDirectory, '/') . '/';
+    /**
+     * Renders a Sphinx project.
+     *
+     * @param string $renderDirectory
+     * @return void
+     */
+    protected function renderProject($renderDirectory)
+    {
+        $renderDirectory = rtrim($renderDirectory, '/') . '/';
 
-		// [START] Convert Settings.yml as standard Python instructions
-		// Since we do not support Yaml configuration file currently...
-		$contents = file_get_contents($renderDirectory . 'cron_rebuild.conf');
-		$settingsYamlFileName = '';
-		$pythonLines = array();
-		$lines = explode(LF, $contents);
-		foreach ($lines as $line) {
-			if (preg_match('/^T3DOCDIR\\s*=\\s*(.+)\s*$/', $line, $matches)) {
-				$settingsYamlFileName = rtrim($matches[1], '/') . '/Settings.yml';
-				$pythonLines = static::yamlToPython($settingsYamlFileName);
-				break;
-			}
-		}
-		if ($pythonLines) {
-			$contents = file_get_contents($renderDirectory . 'conf.py');
-			$contents .= LF . LF . implode(LF, $pythonLines);
-			file_put_contents($renderDirectory . 'conf.py', $contents);
-			// Legacy from cron_rebuild.sh to detect PDF output
-			copy($settingsYamlFileName, $renderDirectory . '10+20+30_conf_py.yml');
-		}
-		// [END] Convert Settings.yml as standard Pythno instructions
+        // [START] Convert Settings.yml as standard Python instructions
+        // Since we do not support Yaml configuration file currently...
+        $contents = file_get_contents($renderDirectory . 'cron_rebuild.conf');
+        $settingsYamlFileName = '';
+        $pythonLines = array();
+        $lines = explode(LF, $contents);
+        foreach ($lines as $line) {
+            if (preg_match('/^T3DOCDIR\\s*=\\s*(.+)\s*$/', $line, $matches)) {
+                $settingsYamlFileName = rtrim($matches[1], '/') . '/Settings.yml';
+                $pythonLines = static::yamlToPython($settingsYamlFileName);
+                break;
+            }
+        }
+        if ($pythonLines) {
+            $contents = file_get_contents($renderDirectory . 'conf.py');
+            $contents .= LF . LF . implode(LF, $pythonLines);
+            file_put_contents($renderDirectory . 'conf.py', $contents);
+            // Legacy from cron_rebuild.sh to detect PDF output
+            copy($settingsYamlFileName, $renderDirectory . '10+20+30_conf_py.yml');
+        }
+        // [END] Convert Settings.yml as standard Pythno instructions
 
-		symlink(rtrim($GLOBALS['CONFIG']['DIR']['etc'], '/') . '/Makefile', $renderDirectory . 'Makefile');
-		symlink(rtrim($GLOBALS['CONFIG']['DIR']['scripts'], '/') . '/cron_rebuild.sh', $renderDirectory . 'cron_rebuild.sh');
+        symlink(rtrim($GLOBALS['CONFIG']['DIR']['etc'], '/') . '/Makefile', $renderDirectory . 'Makefile');
+        symlink(rtrim($GLOBALS['CONFIG']['DIR']['scripts'], '/') . '/cron_rebuild.sh', $renderDirectory . 'cron_rebuild.sh');
 
-		// Invoke rendering
-		$cmd = 'cd ' . $renderDirectory . ' && touch REBUILD_REQUESTED && ./cron_rebuild.sh';
-		exec($cmd);
+        // Invoke rendering
+        $cmd = 'cd ' . $renderDirectory . ' && touch REBUILD_REQUESTED && ./cron_rebuild.sh';
+        exec($cmd);
 
-		// TODO? Copy warnings*.txt + possible pdflatex log to output directory
-	}
+        // TODO? Copy warnings*.txt + possible pdflatex log to output directory
+    }
 
-	/**
-	 * Adds a reference to the documentation (e.g., used by EXT:sphinx).
-	 *
-	 * @param string $extensionKey
-	 * @param string $format
-	 * @param string $version
-	 * @param string $extensionDirectory
-	 * @param string $buildDirectory
-	 * @return void
-	 */
-	protected function addReference($extensionKey, $format, $version, $extensionDirectory, $buildDirectory) {
-		$extensionDirectory = rtrim($extensionDirectory, '/') . '/';
-		$buildDirectory = rtrim($buildDirectory, '/');	// No trailing slash here!
-		$referenceFilename = rtrim($GLOBALS['CONFIG']['DIR']['publish'], '/') . '/manuals.json';
-		$references = array();
-		if (is_file($referenceFilename)) {
-			$references = json_decode(file_get_contents($referenceFilename), TRUE);
-			if (!is_array($references)) {
-				$references = array();
-			}
-		}
+    /**
+     * Adds a reference to the documentation (e.g., used by EXT:sphinx).
+     *
+     * @param string $extensionKey
+     * @param string $format
+     * @param string $version
+     * @param string $extensionDirectory
+     * @param string $buildDirectory
+     * @return void
+     */
+    protected function addReference($extensionKey, $format, $version, $extensionDirectory, $buildDirectory)
+    {
+        $extensionDirectory = rtrim($extensionDirectory, '/') . '/';
+        $buildDirectory = rtrim($buildDirectory, '/');    // No trailing slash here!
+        $referenceFilename = rtrim($GLOBALS['CONFIG']['DIR']['publish'], '/') . '/manuals.json';
+        $references = array();
+        if (is_file($referenceFilename)) {
+            $references = json_decode(file_get_contents($referenceFilename), TRUE);
+            if (!is_array($references)) {
+                $references = array();
+            }
+        }
 
-		$references[$extensionKey] = array(
-			'lastupdated' => time(),
-			'format' => $format,
-			'version' => $version,
-		);
+        $references[$extensionKey] = array(
+            'lastupdated' => time(),
+            'format' => $format,
+            'version' => $version,
+        );
 
-		if ($format == static::DOCUMENTATION_TYPE_SPHINX) {
-			if (count(glob($buildDirectory . '/_pdf/*.pdf')) > 0) {
-				$references[$extensionKey]['pdf'][] = 'default';
-			}
+        if ($format == static::DOCUMENTATION_TYPE_SPHINX) {
+            if (count(glob($buildDirectory . '/_pdf/*.pdf')) > 0) {
+                $references[$extensionKey]['pdf'][] = 'default';
+            }
 
-			$directories = $this->get_dirs($extensionDirectory . 'Documentation/');
-			foreach ($directories as $directory) {
-				if (preg_match('/^Localization\.(.*)/', $directory, $matches)) {
-					$locale = str_replace('_', '-', strtolower($matches[1]));
-					$version = basename($buildDirectory);
-					$localeDirectory = $buildDirectory . '/../' . $locale . '/' . $version . '/';
-					if (is_file($localeDirectory . 'Index.html')) {
-						$references[$extensionKey]['localizations'][] = $matches[1];
+            $directories = $this->get_dirs($extensionDirectory . 'Documentation/');
+            foreach ($directories as $directory) {
+                if (preg_match('/^Localization\.(.*)/', $directory, $matches)) {
+                    $locale = str_replace('_', '-', strtolower($matches[1]));
+                    $version = basename($buildDirectory);
+                    $localeDirectory = $buildDirectory . '/../' . $locale . '/' . $version . '/';
+                    if (is_file($localeDirectory . 'Index.html')) {
+                        $references[$extensionKey]['localizations'][] = $matches[1];
 
-						if (count(glob($localeDirectory . '_pdf/*.pdf')) > 0) {
-							$references[$extensionKey]['pdf'][] = $matches[1];
-						}
-					}
-				}
-			}
-		}
+                        if (count(glob($localeDirectory . '_pdf/*.pdf')) > 0) {
+                            $references[$extensionKey]['pdf'][] = $matches[1];
+                        }
+                    }
+                }
+            }
+        }
 
-		ksort($references);
-		file_put_contents($referenceFilename, json_encode($references));
-	}
+        ksort($references);
+        file_put_contents($referenceFilename, json_encode($references));
+    }
 
-	/**
-	 * Updates the list of extensions in "extensions.js".
-	 *
-	 * @param string $extensionKey
-	 * @param string $directory Build directory of the last rendered documentation (thus incl. version number at the end)
-	 * @return void
-	 */
-	protected function updateListOfExtensions($extensionKey, $directory, $refresh = FALSE) {
-		$extensionsJsFilename = rtrim($GLOBALS['CONFIG']['DIR']['publish'], '/') . '/extensions.js';
-		$extensions = array();
-		if (is_file($extensionsJsFilename)) {
-			$content = file_get_contents($extensionsJsFilename);
-			$declaration = 'var extensionList =';
-			// Cut to beginning of JSON string
-			$content = trim(substr($content, strpos($content, $declaration) + strlen($declaration)));
-			// Cut from end of JSON string (trailing semicolon)
-			$content = substr($content, 0, -1);
-			if ($content{0} === '[') {
-				$extensions = json_decode($content, TRUE);
-				if ($extensions === NULL) {
-					// Something went wrong, we do not want to further corrupt the file
-					echo '[WARNING] File ' . $extensionsJsFilename . ' cannot be decoded, please investigate and fix it.' . LF;
-					return;
-				}
-				$numberOfExtensions = count($extensions);
-				$list = array();
-				for ($i = 0; $i < $numberOfExtensions; $i++) {
-					$list[$extensions[$i]['key']] = $extensions[$i];
-				}
-				$extensions = $list;
-				unset($list);
-				if ($refresh) {
-					$exts = array_keys($extensions);
-					foreach ($exts as $ext) {
-						$extDir = rtrim($GLOBALS['CONFIG']['DIR']['publish'], '/') . '/' . $ext;
-						if (is_dir($extDir)) {
-							echo '   [INFO] Refreshing versions of ' . $ext . LF;
-							$this->updateListOfExtensions($ext, $extDir . '/latest');
-						}
-					}
-					return;
-				}
-			}
-		} else {
-			// TODO: initialize this file by searching for every existing extensions and versions?
-		}
-		if (count($extensions) === 0) {
-			return;
-		}
+    /**
+     * Updates the list of extensions in "extensions.js".
+     *
+     * @param string $extensionKey
+     * @param string $directory Build directory of the last rendered documentation (thus incl. version number at the end)
+     * @return void
+     */
+    protected function updateListOfExtensions($extensionKey, $directory, $refresh = FALSE)
+    {
+        $extensionsJsFilename = rtrim($GLOBALS['CONFIG']['DIR']['publish'], '/') . '/extensions.js';
+        $extensions = array();
+        if (is_file($extensionsJsFilename)) {
+            $content = file_get_contents($extensionsJsFilename);
+            $declaration = 'var extensionList =';
+            // Cut to beginning of JSON string
+            $content = trim(substr($content, strpos($content, $declaration) + strlen($declaration)));
+            // Cut from end of JSON string (trailing semicolon)
+            $content = substr($content, 0, -1);
+            if ($content{0} === '[') {
+                $extensions = json_decode($content, TRUE);
+                if ($extensions === NULL) {
+                    // Something went wrong, we do not want to further corrupt the file
+                    echo '[WARNING] File ' . $extensionsJsFilename . ' cannot be decoded, please investigate and fix it.' . LF;
+                    return;
+                }
+                $numberOfExtensions = count($extensions);
+                $list = array();
+                for ($i = 0; $i < $numberOfExtensions; $i++) {
+                    $list[$extensions[$i]['key']] = $extensions[$i];
+                }
+                $extensions = $list;
+                unset($list);
+                if ($refresh) {
+                    $exts = array_keys($extensions);
+                    foreach ($exts as $ext) {
+                        $extDir = rtrim($GLOBALS['CONFIG']['DIR']['publish'], '/') . '/' . $ext;
+                        if (is_dir($extDir)) {
+                            echo '   [INFO] Refreshing versions of ' . $ext . LF;
+                            $this->updateListOfExtensions($ext, $extDir . '/latest');
+                        }
+                    }
+                    return;
+                }
+            }
+        } else {
+            // TODO: initialize this file by searching for every existing extensions and versions?
+        }
+        if (count($extensions) === 0) {
+            return;
+        }
 
-		$versions = $this->get_dirs(dirname($directory));
-		$versions = array_flip($versions);
+        $versions = $this->get_dirs(dirname($directory));
+        $versions = array_flip($versions);
 
-		// No real versions
-		unset($versions['packages']);
-		unset($versions['stable']);
+        // No real versions
+        unset($versions['packages']);
+        unset($versions['stable']);
 
-		$hasLatest = isset($versions['latest']);
-		unset($versions['latest']);
-		$versions = array_flip($versions);
+        $hasLatest = isset($versions['latest']);
+        unset($versions['latest']);
+        $versions = array_flip($versions);
 
-		// Remove localizations
-		for ($i = 0; $i < count($versions); $i++) {
-			if (!preg_match('/^[0-9]/', $versions[$i])) {
-				unset($versions[$i]);
-			}
-		}
+        // Remove localizations
+        for ($i = 0; $i < count($versions); $i++) {
+            if (!preg_match('/^[0-9]/', $versions[$i])) {
+                unset($versions[$i]);
+            }
+        }
 
-		// Reverse sort the list of versions
-		usort($versions, function($a, $b) {
-			return version_compare($b, $a);
-		});
+        // Reverse sort the list of versions
+        usort($versions, function ($a, $b) {
+            return version_compare($b, $a);
+        });
 
-		if ($hasLatest) {
-			array_unshift($versions, 'latest');
-		}
+        if ($hasLatest) {
+            array_unshift($versions, 'latest');
+        }
 
-		$extensions[$extensionKey] = array(
-			'key' => $extensionKey,
-			'latest' => $versions[0],
-			'versions' => $versions,
-		);
+        $extensions[$extensionKey] = array(
+            'key' => $extensionKey,
+            'latest' => $versions[0],
+            'versions' => $versions,
+        );
 
-		// Sort by extension key
-		ksort($extensions);
+        // Sort by extension key
+        ksort($extensions);
 
-		$content = '// BEWARE: this file has been automatically generated by ' . __CLASS__ . LF;
-		$content .= '// on ' . date('d.m.Y H:i:s') . LF;
-		$content .= '// DO NOT MODIFY MANUALLY' . LF;
-		$content .= $declaration . ' ';
+        $content = '// BEWARE: this file has been automatically generated by ' . __CLASS__ . LF;
+        $content .= '// on ' . date('d.m.Y H:i:s') . LF;
+        $content .= '// DO NOT MODIFY MANUALLY' . LF;
+        $content .= $declaration . ' ';
 
-		$json = json_encode(array_values($extensions));
-		// Prettify a bit the JSON (without making it too verbose if we would use built-in feature of PHP 5.4)
-		$json = "[\n\t" . substr($json, 1, -1) . "\n]";
-		$json = str_replace('},', "},\n\t", $json);
+        $json = json_encode(array_values($extensions));
+        // Prettify a bit the JSON (without making it too verbose if we would use built-in feature of PHP 5.4)
+        $json = "[\n\t" . substr($json, 1, -1) . "\n]";
+        $json = str_replace('},', "},\n\t", $json);
 
-		$content .= $json . ';';
+        $content .= $json . ';';
 
-		file_put_contents($extensionsJsFilename, $content);
-	}
+        file_put_contents($extensionsJsFilename, $content);
+    }
 
-	/**
-	 * Cleans-up a directory.
-	 *
-	 * @param string $path
-	 * @return void
-	 */
-	protected function cleanUpDirectory($path) {
-		exec('rm -rf ' . escapeshellarg($path));
-		exec('mkdir -p ' . escapeshellarg($path));
-	}
+    /**
+     * Cleans-up a directory.
+     *
+     * @param string $path
+     * @return void
+     */
+    protected function cleanUpDirectory($path)
+    {
+        exec('rm -rf ' . escapeshellarg($path));
+        exec('mkdir -p ' . escapeshellarg($path));
+    }
 
-	/**
-	 * Removes an extensionKey/version pair from the rendering queue.
-	 *
-	 * @param string $extensionKey
-	 * @param string $version
-	 * @return void
-	 */
-	protected function removeFromQueue($extensionKey, $version) {
-		$queueDirectory = rtrim($GLOBALS['CONFIG']['DIR']['work'], '/') . '/queue/';
-		$path = $queueDirectory . $extensionKey . '/' . $version;
-		exec('rm -rf ' . $path);
-	}
+    /**
+     * Removes an extensionKey/version pair from the rendering queue.
+     *
+     * @param string $extensionKey
+     * @param string $version
+     * @return void
+     */
+    protected function removeFromQueue($extensionKey, $version)
+    {
+        $queueDirectory = rtrim($GLOBALS['CONFIG']['DIR']['work'], '/') . '/queue/';
+        $path = $queueDirectory . $extensionKey . '/' . $version;
+        exec('rm -rf ' . $path);
+    }
 
-	/**
-	 * Returns an array with the names of folders in a specific path
-	 * Will return 'error' (string) if there were an error with reading directory content.
-	 *
-	 * @param string $path Path to list directories from
-	 * @return array Returns an array with the directory entries as values.
-	 * @see \TYPO3\CMS\Core\Utility\GeneralUtility::get_dirs()
-	 */
-	protected function get_dirs($path) {
-		$dirs = array();
-		if ($path) {
-			if (is_dir($path)) {
-				$dir = scandir($path);
-				foreach ($dir as $entry) {
-					if (is_dir($path . '/' . $entry) && $entry != '..' && $entry != '.') {
-						$dirs[] = $entry;
-					}
-				}
-			} else {
-				$dirs = 'error';
-			}
-		}
-		return $dirs;
-	}
+    /**
+     * Returns an array with the names of folders in a specific path
+     * Will return 'error' (string) if there were an error with reading directory content.
+     *
+     * @param string $path Path to list directories from
+     * @return array Returns an array with the directory entries as values.
+     * @see \TYPO3\CMS\Core\Utility\GeneralUtility::get_dirs()
+     */
+    protected function get_dirs($path)
+    {
+        $dirs = array();
+        if ($path) {
+            if (is_dir($path)) {
+                $dir = scandir($path);
+                foreach ($dir as $entry) {
+                    if (is_dir($path . '/' . $entry) && $entry != '..' && $entry != '.') {
+                        $dirs[] = $entry;
+                    }
+                }
+            } else {
+                $dirs = 'error';
+            }
+        }
+        return $dirs;
+    }
 
-	/**
-	 * Converts a (simple) YAML file to Python instructions.
-	 *
-	 * Note: First tried to use 3rd party libraries:
-	 *
-	 * - spyc: http://code.google.com/p/spyc/
-	 * - Symfony2 YAML: http://symfony.com/doc/current/components/yaml/introduction.html
-	 *
-	 * but none of them were able to parse our Settings.yml Sphinx configuration files.
-	 *
-	 * NOTE: This is the exact copy of \Causal\Sphinx\Utility\MiscUtility::yamlToPython()
-	 *
-	 * @param string $filename Absolute filename to Settings.yml
-	 * @return string Python instruction set
-	 */
-	static protected function yamlToPython($filename) {
-		$contents = file_get_contents($filename);
-		$lines = explode(LF, $contents);
-		$pythonConfiguration = array();
+    /**
+     * Converts a (simple) YAML file to Python instructions.
+     *
+     * Note: First tried to use 3rd party libraries:
+     *
+     * - spyc: http://code.google.com/p/spyc/
+     * - Symfony2 YAML: http://symfony.com/doc/current/components/yaml/introduction.html
+     *
+     * but none of them were able to parse our Settings.yml Sphinx configuration files.
+     *
+     * NOTE: This is the exact copy of \Causal\Sphinx\Utility\MiscUtility::yamlToPython()
+     *
+     * @param string $filename Absolute filename to Settings.yml
+     * @return string Python instruction set
+     */
+    static protected function yamlToPython($filename)
+    {
+        $contents = file_get_contents($filename);
+        $lines = explode(LF, $contents);
+        $pythonConfiguration = array();
 
-		// Remove empty lines and comments
-		$lines = array_values(array_filter($lines, function ($line) {
-			return !(trim($line) === '' || preg_match('/^\\s*#/', $line));
-		}));
+        // Remove empty lines and comments
+        $lines = array_values(array_filter($lines, function ($line) {
+            return !(trim($line) === '' || preg_match('/^\\s*#/', $line));
+        }));
 
-		$i = 0;
-		while ($lines[$i] !== 'conf.py:' && $i < count($lines)) {
-			$i++;
-		}
-		while ($i < count($lines)) {
-			if (preg_match('/^(\s+)([^:]+):\s*(.*)$/', $lines[$i], $matches)) {
-				switch ($matches[2]) {
-					case 'latex_documents':
-						$pythonLine = 'latex_documents = [(' . LF;
-						if (preg_match('/^(\s+)- - /', $lines[$i + 1], $matches)) {
-							$indent = $matches[1];
-							$firstLine = TRUE;
-							while (preg_match('/^' . $indent . '(- -|  -) (.+)$/', $lines[++$i], $matches)) {
-								if (!$firstLine) {
-									$pythonLine .= ',' . LF;
-								}
-								$pythonLine .= sprintf('u\'%s\'', addcslashes($matches[2], "\\'"));
-								$firstLine = FALSE;
-							}
-						}
-						$pythonLine .= LF . ')]';
-						$i--;
-					break;
-					case 'latex_elements':
-					case 'html_theme_options':
-						$pythonLine = $matches[2] . ' = {' . LF;
-						if (preg_match('/^(\s+)/', $lines[$i + 1], $matches)) {
-							$indent = $matches[1];
-							$firstLine = TRUE;
-							while (preg_match('/^' . $indent . '([^:]+):\s*(.*)$/', $lines[++$i], $matches)) {
-								if (!$firstLine) {
-									$pythonLine .= ',' . LF;
-								}
-								$pythonLine .= sprintf('\'%s\': ', $matches[1]);
-								if ($matches[2] === 'null') {
-									$pythonLine .= 'None';
-								} elseif (/*GeneralUtility*/static::inList('true,false', strtolower($matches[2]))) {
-									$pythonLine .= ucfirst($matches[2]);
-								} elseif (/*\TYPO3\CMS\Core\Utility\MathUtility*/static::canBeInterpretedAsInteger($matches[2])) {
-									$pythonLine .= intval($matches[2]);
-								} else {
-									$pythonLine .= sprintf('\'%s\'', addcslashes($matches[2], "\\'"));
-								}
-								$firstLine = FALSE;
-							}
-						}
-						$pythonLine .= LF . '}';
-						$i--;
-					break;
-					case 'extensions':
-						$pythonLine = 'extensions = [';
-						if (preg_match('/^(\s+)/', $lines[$i + 1], $matches)) {
-							$indent = $matches[1];
-							$firstItem = TRUE;
-							while (preg_match('/^' . $indent . '- (.+)/', $lines[++$i], $matches)) {
-								if (/*GeneralUtility*/static::isFirstPartOfStr($matches[1], 't3sphinx.')) {
-									// Extension t3sphinx is not compatible with JSON output
-									continue;
-								}
+        $i = 0;
+        while ($lines[$i] !== 'conf.py:' && $i < count($lines)) {
+            $i++;
+        }
+        while ($i < count($lines)) {
+            if (preg_match('/^(\s+)([^:]+):\s*(.*)$/', $lines[$i], $matches)) {
+                switch ($matches[2]) {
+                    case 'latex_documents':
+                        $pythonLine = 'latex_documents = [(' . LF;
+                        if (preg_match('/^(\s+)- - /', $lines[$i + 1], $matches)) {
+                            $indent = $matches[1];
+                            $firstLine = TRUE;
+                            while (preg_match('/^' . $indent . '(- -|  -) (.+)$/', $lines[++$i], $matches)) {
+                                if (!$firstLine) {
+                                    $pythonLine .= ',' . LF;
+                                }
+                                $pythonLine .= sprintf('u\'%s\'', addcslashes($matches[2], "\\'"));
+                                $firstLine = FALSE;
+                            }
+                        }
+                        $pythonLine .= LF . ')]';
+                        $i--;
+                        break;
+                    case 'latex_elements':
+                    case 'html_theme_options':
+                        $pythonLine = $matches[2] . ' = {' . LF;
+                        if (preg_match('/^(\s+)/', $lines[$i + 1], $matches)) {
+                            $indent = $matches[1];
+                            $firstLine = TRUE;
+                            while (preg_match('/^' . $indent . '([^:]+):\s*(.*)$/', $lines[++$i], $matches)) {
+                                if (!$firstLine) {
+                                    $pythonLine .= ',' . LF;
+                                }
+                                $pythonLine .= sprintf('\'%s\': ', $matches[1]);
+                                if ($matches[2] === 'null') {
+                                    $pythonLine .= 'None';
+                                } elseif (/*GeneralUtility*/
+                                static::inList('true,false', strtolower($matches[2]))
+                                ) {
+                                    $pythonLine .= ucfirst($matches[2]);
+                                } elseif (/*\TYPO3\CMS\Core\Utility\MathUtility*/
+                                static::canBeInterpretedAsInteger($matches[2])
+                                ) {
+                                    $pythonLine .= intval($matches[2]);
+                                } else {
+                                    $pythonLine .= sprintf('\'%s\'', addcslashes($matches[2], "\\'"));
+                                }
+                                $firstLine = FALSE;
+                            }
+                        }
+                        $pythonLine .= LF . '}';
+                        $i--;
+                        break;
+                    case 'extensions':
+                        $pythonLine = 'extensions = [';
+                        if (preg_match('/^(\s+)/', $lines[$i + 1], $matches)) {
+                            $indent = $matches[1];
+                            $firstItem = TRUE;
+                            while (preg_match('/^' . $indent . '- (.+)/', $lines[++$i], $matches)) {
+                                if (/*GeneralUtility*/
+                                static::isFirstPartOfStr($matches[1], 't3sphinx.')
+                                ) {
+                                    // Extension t3sphinx is not compatible with JSON output
+                                    continue;
+                                }
 
-								if (!$firstItem) {
-									$pythonLine .= ', ';
-								}
-								$pythonLine .= sprintf('\'%s\'', addcslashes($matches[1], "\\'"));
-								$firstItem = FALSE;
-							}
-							$i--;
-						}
-						$pythonLine .= ']';
-					break;
-					case 'extlinks':
-					case 'intersphinx_mapping':
-						$pythonLine = $matches[2] . ' = {' . LF;
-						if (preg_match('/^(\s+)/', $lines[$i + 1], $matches)) {
-							$indent = $matches[1];
-							$firstLine = TRUE;
-							while (preg_match('/^' . $indent . '(.+):/', $lines[++$i], $matches)) {
-								if (!$firstLine) {
-									$pythonLine .= ',' . LF;
-								}
-								$pythonLine .= sprintf('\'%s\': (', $matches[1]);
-								$firstItem = TRUE;
-								while (preg_match('/^' . $indent . '- (.+)/', $lines[++$i], $matches)) {
-									if (!$firstItem) {
-										$pythonLine .= ', ';
-									}
-									if ($matches[1] === 'null') {
-										$pythonLine .= 'None';
-									} else {
-										$pythonLine .= sprintf('\'%s\'', trim(trim($matches[1]), '\''));
-									}
-									$firstItem = FALSE;
-								}
-								$pythonLine .= ')';
-								$firstLine = FALSE;
-								$i--;
-							}
-						}
-						$pythonLine .= LF . '}';
-						$i--;
-					break;
-					case 'version':
-					case 'release':
-						$pythonLine = sprintf('%s = u\'%s\'', $matches[2], addcslashes($matches[3], "\\'"));
-						break;
-					default:
-						$pythonLine = $matches[2] . ' = ';
-						if ($matches[3] === 'null') {
-							$pythonLine .= 'None';
-						} elseif (/*GeneralUtility*/static::inList('true,false', strtolower($matches[3]))) {
-							$pythonLine .= ucfirst($matches[3]);
-						} elseif (/*\TYPO3\CMS\Core\Utility\MathUtility*/static::canBeInterpretedAsInteger($matches[3])) {
-							$pythonLine .= intval($matches[3]);
-						} else {
-							$pythonLine .= sprintf('u\'%s\'', addcslashes($matches[3], "\\'"));
-						}
-					break;
-				}
-				if (!empty($pythonLine)) {
-					$pythonConfiguration[] = $pythonLine;
-				}
-			}
-			$i++;
-		}
+                                if (!$firstItem) {
+                                    $pythonLine .= ', ';
+                                }
+                                $pythonLine .= sprintf('\'%s\'', addcslashes($matches[1], "\\'"));
+                                $firstItem = FALSE;
+                            }
+                            $i--;
+                        }
+                        $pythonLine .= ']';
+                        break;
+                    case 'extlinks':
+                    case 'intersphinx_mapping':
+                        $pythonLine = $matches[2] . ' = {' . LF;
+                        if (preg_match('/^(\s+)/', $lines[$i + 1], $matches)) {
+                            $indent = $matches[1];
+                            $firstLine = TRUE;
+                            while (preg_match('/^' . $indent . '(.+):/', $lines[++$i], $matches)) {
+                                if (!$firstLine) {
+                                    $pythonLine .= ',' . LF;
+                                }
+                                $pythonLine .= sprintf('\'%s\': (', $matches[1]);
+                                $firstItem = TRUE;
+                                while (preg_match('/^' . $indent . '- (.+)/', $lines[++$i], $matches)) {
+                                    if (!$firstItem) {
+                                        $pythonLine .= ', ';
+                                    }
+                                    if ($matches[1] === 'null') {
+                                        $pythonLine .= 'None';
+                                    } else {
+                                        $pythonLine .= sprintf('\'%s\'', trim(trim($matches[1]), '\''));
+                                    }
+                                    $firstItem = FALSE;
+                                }
+                                $pythonLine .= ')';
+                                $firstLine = FALSE;
+                                $i--;
+                            }
+                        }
+                        $pythonLine .= LF . '}';
+                        $i--;
+                        break;
+                    case 'copyright':
+                    case 'version':
+                    case 'release':
+                        $pythonLine = sprintf('%s = u\'%s\'', $matches[2], addcslashes($matches[3], "\\'"));
+                        break;
+                    default:
+                        $pythonLine = $matches[2] . ' = ';
+                        if ($matches[3] === 'null') {
+                            $pythonLine .= 'None';
+                        } elseif (/*GeneralUtility*/
+                        static::inList('true,false', strtolower($matches[3]))
+                        ) {
+                            $pythonLine .= ucfirst($matches[3]);
+                        } elseif (/*\TYPO3\CMS\Core\Utility\MathUtility*/
+                        static::canBeInterpretedAsInteger($matches[3])
+                        ) {
+                            $pythonLine .= intval($matches[3]);
+                        } else {
+                            $pythonLine .= sprintf('u\'%s\'', addcslashes($matches[3], "\\'"));
+                        }
+                        break;
+                }
+                if (!empty($pythonLine)) {
+                    $pythonConfiguration[] = $pythonLine;
+                }
+            }
+            $i++;
+        }
 
-		return $pythonConfiguration;
-	}
+        return $pythonConfiguration;
+    }
 
-	/**
-	 * Tests if the input can be interpreted as integer.
-	 *
-	 * Note: Integer casting from objects or arrays is considered undefined and thus will return false.
-	 *
-	 * @see http://php.net/manual/en/language.types.integer.php#language.types.integer.casting.from-other
-	 * @param mixed $var Any input variable to test
-	 * @return bool Returns TRUE if string is an integer
-	 */
-	static protected function canBeInterpretedAsInteger($var) {
-		if ($var === '' || is_object($var) || is_array($var)) {
-			return FALSE;
-		}
-		return (string)(int)$var === (string)$var;
-	}
+    /**
+     * Tests if the input can be interpreted as integer.
+     *
+     * Note: Integer casting from objects or arrays is considered undefined and thus will return false.
+     *
+     * @see http://php.net/manual/en/language.types.integer.php#language.types.integer.casting.from-other
+     * @param mixed $var Any input variable to test
+     * @return bool Returns TRUE if string is an integer
+     */
+    static protected function canBeInterpretedAsInteger($var)
+    {
+        if ($var === '' || is_object($var) || is_array($var)) {
+            return FALSE;
+        }
+        return (string)(int)$var === (string)$var;
+    }
 
-	/**
-	 * Check for item in list
-	 * Check if an item exists in a comma-separated list of items.
-	 *
-	 * @param string $list Comma-separated list of items (string)
-	 * @param string $item Item to check for
-	 * @return bool TRUE if $item is in $list
-	 */
-	static protected function inList($list, $item) {
-		return strpos(',' . $list . ',', ',' . $item . ',') !== FALSE;
-	}
+    /**
+     * Check for item in list
+     * Check if an item exists in a comma-separated list of items.
+     *
+     * @param string $list Comma-separated list of items (string)
+     * @param string $item Item to check for
+     * @return bool TRUE if $item is in $list
+     */
+    static protected function inList($list, $item)
+    {
+        return strpos(',' . $list . ',', ',' . $item . ',') !== FALSE;
+    }
 
-	/**
-	 * Returns TRUE if the first part of $str matches the string $partStr
-	 *
-	 * @param string $str Full string to check
-	 * @param string $partStr Reference string which must be found as the "first part" of the full string
-	 * @return bool TRUE if $partStr was found to be equal to the first part of $str
-	 */
-	static protected function isFirstPartOfStr($str, $partStr) {
-		return $partStr != '' && strpos((string)$str, (string)$partStr, 0) === 0;
-	}
+    /**
+     * Returns TRUE if the first part of $str matches the string $partStr
+     *
+     * @param string $str Full string to check
+     * @param string $partStr Reference string which must be found as the "first part" of the full string
+     * @return bool TRUE if $partStr was found to be equal to the first part of $str
+     */
+    static protected function isFirstPartOfStr($str, $partStr)
+    {
+        return $partStr != '' && strpos((string)$str, (string)$partStr, 0) === 0;
+    }
 
 }
 

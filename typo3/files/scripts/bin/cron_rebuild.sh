@@ -157,6 +157,8 @@ function compilepdf() {
         # Move PDF to a directory "_pdf" (instead of "latex")
         mkdir $BUILDDIR/_pdf
         mv $PDFFILE $BUILDDIR/_pdf/$TARGETPDF
+        # Create a redirect for Nginx
+        echo "<html><head><meta http-equiv=\"refresh\" content=\"0;URL=$TARGETPDF\"></head></html>" > $BUILDDIR/_pdf/Index.html
 
         # Create a .htaccess that redirects everything to the real PDF
         # Remove "/home/mbless/public_html" at the beginning
@@ -357,10 +359,6 @@ function renderdocumentation() {
 
     # Switch rendered documentation in public_html
     lazy_mv $BUILDDIR $ORIG_BUILDDIR
-    #chgrp -R www-default $ORIG_BUILDDIR
-    #if [ ! -r "$ORIG_BUILDDIR/../.htaccess" ]; then
-    #    ln -s $BIN_DIRECTORY/../config/_htaccess $ORIG_BUILDDIR/../.htaccess
-    #fi
 
     # Recreate "stable" link if needed
     STABLE_VERSION=""
@@ -379,7 +377,7 @@ function renderdocumentation() {
         if [ ! -r "$ORIG_BUILDDIR/../stable" ] || [ -h "$ORIG_BUILDDIR/../stable" ]; then
             pushd $ORIG_BUILDDIR/.. >/dev/null
             echo "Recreating stable symbolic link in $PWD"
-            rm -I stable
+            [ -d stable ] && rm -I stable
             ln -s $STABLE_VERSION stable
             popd >/dev/null
         fi

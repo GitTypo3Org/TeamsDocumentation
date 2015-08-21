@@ -1,0 +1,208 @@
+#!/bin/bash
+
+. /home/sphinx/scripts/etc/sphinx.conf
+
+echo -n "Enter the Git repository URL (https://github.com/TYPO3-Documentation/...): "
+read GIT
+
+echo ${GIT} | egrep -q "^https://github.com/TYPO3-Documentation/.*\.git"
+if [ $? -ne 0 ]; then
+    echo "  [ERROR] Unsupported repository URL" >&2
+    exit 1
+fi
+
+echo -n "Enter the name of the branch: "
+read BRANCH
+
+if [ $(echo -n ${BRANCH} | wc -c) -eq 0 ]; then
+    echo "  [ERROR] Empty branch" >&2
+    exit 2
+fi
+
+VERSION=$(echo ${BRANCH} | sed 's/-/./g')
+LANGUAGE=default
+
+case ${GIT} in
+    # -- BOOKS --
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Book-ExtbaseFluid.git )
+        TYPE=books
+        PROJECT=t3extbasebook
+        ;;
+
+    # -- EXAMPLES --
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Example-ExtensionManual.git )
+        TYPE=examples
+        PROJECT=ExtensionManual
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Example-OfficialManual.git )
+        TYPE=examples
+        PROJECT=OfficialManual
+        ;;
+
+    # -- GUIDES --
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Guide-Extbase.git )
+        TYPE=guides
+        PROJECT=t3extbase
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Guide-FrontendLocalization.git )
+        TYPE=guides
+        PROJECT=t3l10n
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Guide-Installation.git )
+        TYPE=guides
+        PROJECT=t3install
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Guide-Maintenance.git )
+        TYPE=guides
+        PROJECT=t3maintenance
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Guide-Security.git )
+        TYPE=guides
+        PROJECT=t3security
+        ;;
+
+    # -- REFERENCES --
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Reference-CodingGuidelines.git )
+        TYPE=references
+        PROJECT=t3cgl
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Reference-CoreApi.git )
+        TYPE=references
+        PROJECT=t3api
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Reference-FileAbstractionLayer.git )
+        TYPE=references
+        PROJECT=t3fal
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Reference-InsideTypo3.git )
+        TYPE=references
+        PROJECT=t3inside
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Reference-Skinning.git )
+        TYPE=references
+        PROJECT=t3skinning
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Reference-TCA.git )
+        TYPE=references
+        PROJECT=t3tca
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Reference-TSconfig.git )
+        TYPE=references
+        PROJECT=t3tsconfig
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Reference-Typo3Services.git )
+        TYPE=references
+        PROJECT=t3services
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Reference-Typoscript.git )
+        TYPE=references
+        PROJECT=t3tsref
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Reference-TyposcriptSyntax.git )
+        TYPE=references
+        PROJECT=t3tssyntax
+        ;;
+
+    # -- TUTORIALS --
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Tutorial-Editors.git )
+        TYPE=tutorials
+        PROJECT=t3editors
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Tutorial-GettingStarted.git )
+        TYPE=tutorials
+        PROJECT=t3start
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Tutorial-Templating.git )
+        TYPE=tutorials
+        PROJECT=t3templating
+        ;;
+
+    https://github.com/TYPO3-Documentation/TYPO3CMS-Tutorial-Typoscript45Minutes.git )
+        TYPE=tutorials
+        PROJECT=t3ts45
+        ;;
+
+esac
+
+if [ -z "${PROJECT}" ]; then
+    echo "  [ERROR] Unknown project" >&2
+    exit 3
+fi
+
+TARGET_DIRECTORY=${PUBLISH_DIRECTORY}/${TYPE}/${PROJECT}/${VERSION}
+if [ -d ${TARGET_DIRECTORY} ]; then
+    echo "  [ERROR] Directory ${TARGET_DIRECTORY} already exists" >&2
+    exit 4
+fi
+
+GIT_DIRECTORY=${LOCAL_GIT_CLONE_DIRECTORY}/$(echo ${GIT} | sed -r 's/^https:\/\/(.*)\.git/\1/')
+if [ ! -d ${GIT_DIRECTORY} ]; then
+    echo "   [INFO] Cloning manual"
+
+    mkdir -p $(dirname ${GIT_DIRECTORY})
+    git clone ${GIT} ${GIT_DIRECTORY}
+fi
+
+echo "   [INFO] Creating project directory"
+PROJECT_DIRECTORY=${PROJECTS_DIRECTORY}/${TYPE}/${PROJECT}/${VERSION}/${LANGUAGE}
+mkdir -p ${PROJECT_DIRECTORY}
+
+echo "   [INFO] Configuring project"
+cat <<CONFIG > ${PROJECT_DIRECTORY}/cron_rebuild.conf
+PROJECT=${PROJECT}
+VERSION=${VERSION}
+
+# Where to publish documentation
+BUILDDIR=${TARGET_DIRECTORY}
+
+# If GITURL is empty then GITDIR is expected to be "ready" to be processed
+GITURL=${GIT}
+GITDIR=${GIT_DIRECTORY}
+GITBRANCH=${BRANCH}
+
+# Path to the documentation within the Git repository
+T3DOCDIR=\${GITDIR}/Documentation
+
+# Packaging information
+PACKAGE_ZIP=0
+PACKAGE_KEY=typo3cms.${TYPE}.${PROJECT}
+PACKAGE_LANGUAGE=${LANGUAGE}
+CONFIG
+
+ln -s /home/sphinx/scripts/bin/cron_rebuild.sh ${PROJECT_DIRECTORY}/cron_rebuild.sh
+ln -s /home/sphinx/scripts/etc/Makefile ${PROJECT_DIRECTORY}/Makefile
+
+cat <<BASH > ${PROJECT_DIRECTORY}/rebuild-manual.sh
+cd ${PROJECT_DIRECTORY}
+cp /home/sphinx/scripts/etc/conf.py .
+
+echo >> conf.py
+echo "master_doc = 'Index'" >> conf.py
+
+touch REBUILD_REQUESTED
+./cron_rebuild.sh
+
+BASH
+
+chmod +x ${PROJECT_DIRECTORY}/rebuild-manual.sh

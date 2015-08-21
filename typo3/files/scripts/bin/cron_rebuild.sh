@@ -102,7 +102,7 @@ function lazy_mv() {
     if [ -d "$PARENT_DIR" ]; then
         rm -rf $TO_DIR
     else
-        mkdir $PARENT_DIR
+        mkdir -p $PARENT_DIR
     fi
     mv $FROM_DIR $TO_DIR
 
@@ -456,6 +456,14 @@ else
         fi
 
         popd >/dev/null
+    fi
+
+    if [ -f $T3DOCDIR/Settings.yml ]; then
+        # Use configuration from Settings.yml to override default conf.py configuration
+        php /home/sphinx/scripts/bin/yaml2python.php $T3DOCDIR/Settings.yml >> ${MAKE_DIRECTORY}/conf.py
+
+        # This is legacy to detect PDF output
+        cp $T3DOCDIR/Settings.yml ${MAKE_DIRECTORY}/10+20+30_conf_py.yml
     fi
 
     BACKUP_T3DOCDIR=$T3DOCDIR

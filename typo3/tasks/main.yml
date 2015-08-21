@@ -34,3 +34,9 @@
 
 - name: Install TYPO3 Share font for LaTeX
   shell: /usr/local/share/texmf/sources/typo3-share/convert-share.sh
+
+- name: Create directory for Git clones ({{ sphinx_git_directory }})
+  file: path={{ sphinx_git_directory }} state=directory owner=sphinx group=sphinx
+
+- name: Create directory for documentation projects ({{ doc_projects }})
+  file: path={{ doc_projects }} state=directory owner=sphinx group=sphinx

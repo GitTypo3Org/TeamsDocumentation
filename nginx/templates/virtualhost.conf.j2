@@ -14,13 +14,13 @@ server {
     charset utf-8;
 
     # When no explicit version is given for a translated manual, use the "stable" one
-    if ($request_uri ~ ^/typo3cms/extensions/([^/]+)/(..-..)/(?!([0-9]+|stable|latest))) {
-        return 303 $scheme://$server_name/typo3cms/extensions/$1/$2/stable/$3;
+    if ($request_uri ~ ^/extensions/([^/]+)/(..-..)/(?!([0-9]+|stable|latest))) {
+        return 303 $scheme://$server_name/extensions/$1/$2/stable/$3;
     }
 
     # When no explicit version is given, use the "stable" one
-    if ($request_uri ~ /typo3cms/extensions/([^/]+)/(?!([0-9]+|stable|latest|packages|..-..))) {
-        return 303 $scheme://$server_name/typo3cms/extensions/$1/stable/$2;
+    if ($request_uri ~ /extensions/([^/]+)/(?!([0-9]+|stable|latest|packages|..-..))) {
+        return 303 $scheme://$server_name/extensions/$1/stable/$2;
     }
 
     include h5bp/basic.conf;
@@ -28,7 +28,7 @@ server {
     location = /favicon.ico { log_not_found off; access_log off; }
     location = /robots.txt  { log_not_found off; access_log off; }
 
-    location ~ /typo3cms/extensions/[^/]+/packages {
+    location ~ /extensions/[^/]+/packages {
         autoindex on;
     }
 }

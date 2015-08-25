@@ -16,7 +16,7 @@
 
 - name: Install Sphinx v{{ sphinx_version }}
   pip: name=Sphinx version={{ sphinx_version }} virtualenv={{ sphinx_virtualenv }}
-  when: virtualenvinstalled
+  when: virtualenvinstalled|success
 
 - name: Install Mercurial
   apt: pkg=mercurial state=installed

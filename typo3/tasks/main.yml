@@ -26,6 +26,15 @@
 - name: Install TYPO3 theme for Sphinx
   pip: name=t3SphinxThemeRtd virtualenv={{ sphinx_virtualenv }}
 
+- name: Install directive t3-field-list-table for Sphinx
+  pip: name=t3fieldlisttable virtualenv={{ sphinx_virtualenv }}
+
+- name: Install directive ref-targets-list for Sphinx
+  pip: name=t3targets virtualenv={{ sphinx_virtualenv }}
+
+- name: Install Sphinx extension to transform table-row
+  pip: name=t3tablerows virtualenv={{ sphinx_virtualenv }}
+
 - name: Install TYPO3 theme for LaTeX
   copy: src=texmf/ dest=/usr/local/share/texmf
 
